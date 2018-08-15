@@ -1,0 +1,264 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "ShaderLab",
+	"scopeName": "source.shader",
+	"patterns": [{
+			"include": "#shader-def"
+		},
+		{
+			"include": "#comment"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.shaderlab",
+				"match": "\\b(if|while|for|return)\\b"
+			}]
+		},
+		"structureKeywords": {
+			"patterns": [{
+				"name": "keyword.other",
+				"match": "\\b(if|while|for|return|Shader)\\b"
+			}]
+		},
+		"comment": {
+			"patterns": [{
+					"name": "comment.block.documentation.shaderlab",
+					"begin": "/\\*(?!/)",
+					"beginCaptures": {
+						"0": {
+							"name": "punctuation.definition.comment.shaderlab"
+						}
+					},
+					"end": "\\*/",
+					"endCaptures": {
+						"0": {
+							"name": "punctuation.definition.comment.shaderlab"
+						}
+					}
+				},
+				{
+					"name": "comment.line.double-slash",
+					"match": "//.*$"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.shaderlab",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [{
+				"name": "constant.character.escape.shaderlab",
+				"match": "\\\\."
+			}]
+		},
+		"blocks": {
+			"name": "meta.block.shaderlab",
+			"begin": "{",
+			"end": "}",
+			"patterns": [{
+				"include": "#expr"
+			}]
+		},
+		"shader-def": {
+			"name": "meta.namespace.shaderlab",
+			"patterns": [{
+				"begin": "(Shader)((?:\\s|/\\*(?!/).*\\*/)*)(\".*\")((?:\\s|/\\*(?!/).*\\*/)*){",
+				"end": "}",
+				"beginCaptures": {
+					"1": {
+						"name": "keyword.other.shaderlab"
+					},
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					},
+					"3": {
+						"patterns": [{
+							"include": "#strings"
+						}]
+					},
+					"4": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					}
+				},
+				"patterns": [{
+						"include": "#shader-props"
+					},
+					{
+						"include": "#sub-shader"
+					}
+				]
+			}]
+		},
+		"shader-props": {
+			"patterns": [{
+				"name": "meta.block.shaderlab",
+				"begin": "(Properties)((?:\\s|/\\*(?!/).*\\*/)*){",
+				"end": "}",
+				"beginCaptures": {
+					"1": {
+						"name": "keyword.other.shaderlab"
+					},
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					}
+				},
+				"patterns": [{
+					"include": "#prop-def"
+				}]
+			}]
+		},
+		"sub-shader": {
+			"patterns": [{
+					"name": "meta.struct.shaderlab",
+					"begin": "(SubShader)\\s*{",
+					"end": "}",
+					"beginCaptures": {
+						"1": {
+							"name": "keyword.other.shaderlab"
+						}
+					},
+					"patterns": [{
+						"include": "#prop-def"
+					}]
+				},
+				{
+					"include": "#comment"
+				}
+			]
+		},
+		"prop-def": {
+			"name": "meta.definition.property.shaderlab",
+			"patterns": [{
+					"include": "#comment"
+				},
+				{
+					"include": "#prop"
+				},
+				{
+					"include": "#prop-type-dec"
+				},
+				{
+					"include": "#assignment"
+				}
+			]
+		},
+		"prop": {
+			"patterns": [{
+				"name": "variable.other.property.shaderlab",
+				"match": "\\b[_a-zA-Z][_a-zA-Z0-9]*\\b"
+			}]
+		},
+		"identifier": {
+			"patterns": [{
+				"name": "entity.name.shaderlab",
+				"match": "\\b[_a-zA-Z][_a-zA-Z0-9]*\\b"
+			}]
+		},
+		"prop-type-dec": {
+			"patterns": [{
+				"name": "meta.declare.shaderlab",
+				"begin": "\\(",
+				"end": "\\)",
+				"patterns": [{
+						"include": "#strings"
+					},
+					{
+						"include": "#prop-type"
+					},
+					{
+						"include": "#comment"
+					}
+				]
+			}]
+		},
+		"prop-type": {
+			"patterns": [{
+					"name": "entity.name.type.shaderlab",
+					"match": "\\b(Int|Float|Color|Vector|2D|Cube|3D|(Range\\(.+\\)))\\b"
+				},
+				{
+					"begin": "(Range)(\\()",
+					"end": "\\)",
+					"beginCaptures": {
+						"1": {
+							"name": "entity.name.type.shaderlab"
+						}
+					},
+					"patterns": [{
+							"include": "#numeric"
+						},
+						{
+							"include": "#comment"
+						}
+					]
+				}
+			]
+		},
+		"numeric": {
+			"patterns": [{
+				"name": "constant.numeric.shaderlab",
+				"match": "[0-9]+(.[0-9]+)"
+			}]
+		},
+		"assignment": {
+			"patterns": [{
+					"name": "keyword.operator.assignment.shaderlab",
+					"match": "=(.+)",
+					"captures": {
+						"1": {
+							"patterns": [{
+									"include": "#expr"
+								},
+								{
+									"include": "#comment"
+								}
+							]
+						}
+					}
+				},
+				{
+					"include": "#comment"
+				}
+			]
+		},
+		"expr": {
+			"patterns": [{
+					"include": "#vector"
+				},
+				{
+					"include": "#numeric"
+				},
+				{
+					"include": "#strings"
+				},
+				{
+					"include": "#blocks"
+				},
+				{
+					"include": "#comment"
+				}
+			]
+		},
+		"vector": {
+			"patterns": [{
+				"begin": "\\(",
+				"end": "\\)",
+				"patterns": [{
+						"include": "#numeric"
+					},
+					{
+						"include": "#comment"
+					}
+				]
+			}]
+		}
+	}
+}

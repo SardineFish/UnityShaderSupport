@@ -1,0 +1,26 @@
+{
+    "name": "unityshader-intellisense",
+    "displayName": "UnityShader Intellisense",
+    "description": "Auto complete support to Unity shader",
+    "version": "0.0.1",
+    "publisher": "SardineFish",
+    "engines": {
+        "vscode": "^1.26.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "shaderlab",
+            "aliases": ["ShaderLab", "shaderlab"],
+            "extensions": [".shader",".cginc",".glslinc"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "shaderlab",
+            "scopeName": "source.shader",
+            "path": "./syntaxes/shaderlab.tmLanguage.json"
+        }]
+    }
+}
