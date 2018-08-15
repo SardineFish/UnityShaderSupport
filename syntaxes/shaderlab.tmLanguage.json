@@ -3,23 +3,58 @@
 	"name": "ShaderLab",
 	"scopeName": "source.shader",
 	"patterns": [{
-			"include": "#shader-def"
-		},
-		{
-			"include": "#comment"
-		}
-	],
+		"include": "#shader-def"
+	}, {
+		"include": "#comment"
+	}],
 	"repository": {
 		"keywords": {
 			"patterns": [{
-				"name": "keyword.control.shaderlab",
-				"match": "\\b(if|while|for|return)\\b"
+				"name": "keyword.other.shaderlab",
+				"match": "\\b(CGPROGRAM|ENDCG|in|out|inout)\\b"
 			}]
 		},
-		"structureKeywords": {
+		"buildin-props": {
 			"patterns": [{
-				"name": "keyword.other",
-				"match": "\\b(if|while|for|return|Shader)\\b"
+				"name": "support.type.property-name.shaderlab",
+				"match": "\\b((?i)Name|Tags|Fallback|CustomEditor|Cull|ZWrite|ZTest|Offset|Blend|BlendOp|ColorMask|AlphaToMask|LOD|Lighting|Stencil|Ref|ReadMask|WriteMask|Comp|CompBack|CompFront|Fail|ZFail|UsePass|GrabPass|Dependency|Material|Diffuse|Ambient|Shininess|Specular|Emission|Fog|Mode|Density|SeparateSpecular|SetTexture|Combine|ConstantColor|Matrix|AlphaTest|ColorMaterial|BindChannels|Bind)\\b"
+			}]
+		},
+		"buildin-tags": {
+			"patterns": [{
+				"name": "support.variable.shaderlab",
+				"match": "\\b((?i)Queue|RenderType|DisableBatching|ForceNoShadowCasting|IgnoreProjector|CanUseSpriteAtlas|PreviewType)\\b"
+			}]
+		},
+		"buildin-tag-values": {
+			"patterns": [{
+				"name": "keyword.other.unit.shaderlab",
+				"match": "\\b((?i)Background|Geometry|AlphaTest|Transparent|Overlay|Opaque|Transparent|TransparentCutout|Background|Overlay|TreeOpaque|TreeTransparentCutout|TreeBillboard|Grass|GrassBillboard|True|False|LODFading|Plane|SkyBox|Sphere)\\b"
+			}]
+		},
+		"render-setup-values": {
+			"patterns": [{
+					"include": "#numeric"
+				},
+				{
+					"name": "keyword.other.render-setup.values.shaderlab",
+					"match": "\\b((?i)Back|Front|Off|Less|Greater|LEqual|GEqual|Equal|NotEqual|Always|On|Off|RGBA|RGB|OffsetFactor|OffsetUnits)\\b"
+				},
+				{
+					"include": "#strings"
+				}
+			]
+		},
+		"buildin-types": {
+			"patterns": [{
+				"name": "storage.type.shaderlab",
+				"match": "\\b(void|float[1-4]?|half[1-4]?|fixed[1-4]?|int[1-4]?|sampler(2D|3D)?)\\b"
+			}]
+		},
+		"struct-keyword": {
+			"patterns": [{
+				"name": "keyword.other.shaderlab",
+				"match": "\\b((?i)Shader|Properties|SubShader|Pass|Category)\\b"
 			}]
 		},
 		"comment": {
@@ -53,22 +88,16 @@
 				"match": "\\\\."
 			}]
 		},
-		"blocks": {
-			"name": "meta.block.shaderlab",
-			"begin": "{",
-			"end": "}",
-			"patterns": [{
-				"include": "#expr"
-			}]
-		},
 		"shader-def": {
-			"name": "meta.namespace.shaderlab",
 			"patterns": [{
-				"begin": "(Shader)((?:\\s|/\\*(?!/).*\\*/)*)(\".*\")((?:\\s|/\\*(?!/).*\\*/)*){",
+				"name": "meta.namespace.shaderlab",
+				"begin": "((?i)Shader)((?:\\s|/\\*(?!/).*\\*/)*)(\".*\")((?:\\s|/\\*(?!/).*\\*/)*)",
 				"end": "}",
 				"beginCaptures": {
 					"1": {
-						"name": "keyword.other.shaderlab"
+						"patterns": [{
+							"include": "#struct-keyword"
+						}]
 					},
 					"2": {
 						"patterns": [{
@@ -91,18 +120,26 @@
 					},
 					{
 						"include": "#sub-shader"
+					},
+					{
+						"include": "#fallback"
+					},
+					{
+						"include": "#comment"
 					}
 				]
 			}]
 		},
 		"shader-props": {
 			"patterns": [{
-				"name": "meta.block.shaderlab",
-				"begin": "(Properties)((?:\\s|/\\*(?!/).*\\*/)*){",
+				"name": "meta.struct.shaderlab",
+				"begin": "((?i)Properties)((?:\\s|/\\*(?!/).*\\*/)*)",
 				"end": "}",
 				"beginCaptures": {
 					"1": {
-						"name": "keyword.other.shaderlab"
+						"patterns": [{
+							"include": "#struct-keyword"
+						}]
 					},
 					"2": {
 						"patterns": [{
@@ -117,22 +154,220 @@
 		},
 		"sub-shader": {
 			"patterns": [{
-					"name": "meta.struct.shaderlab",
-					"begin": "(SubShader)\\s*{",
-					"end": "}",
-					"beginCaptures": {
-						"1": {
-							"name": "keyword.other.shaderlab"
-						}
+				"begin": "((?i)SubShader)((?:\\s|/\\*(?!/).*\\*/)*)",
+				"end": "}",
+				"beginCaptures": {
+					"1": {
+						"patterns": [{
+							"include": "#struct-keyword"
+						}]
 					},
-					"patterns": [{
-						"include": "#prop-def"
-					}]
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					}
+				},
+				"patterns": [
+					{
+						"include": "#comment"
+					},
+					{
+						"include": "#tags"
+					},
+					{
+						"include": "#cg-block"
+					},
+					{
+						"include": "#pass"
+					},
+					{
+						"include": "#render-setup"
+					}
+				]
+			}]
+		},
+		"tags": {
+			"patterns": [{
+				"name": "meta.struct.tags.shaderlab",
+				"begin": "((?i)Tags)",
+				"end": "$",
+				"beginCaptures": {
+					"1": {
+						"patterns": [{
+							"include": "#buildin-props"
+						}]
+					},
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					}
+				},
+				"patterns": [
+					{
+						"include": "#comment"
+					},
+					{
+						"name": "meta.block.shaderlab",
+						"begin": "{",
+						"end": "}",
+						"patterns": [
+							{
+								"include": "#comment"
+							},
+							{
+								"name": "support.property-value",
+								"match": "(\"(?:[^/]|/(?![*/]))*?\")((?:\\s|/\\*(?!/).*\\*/)*)=((?:\\s|/\\*(?!/).*\\*/)*)(\"(?:[^/]|/(?![*/]))*?\")",
+								"captures": {
+									"1": {
+										"patterns": [{
+											"name": "string.quoted.double",
+											"begin": "\"",
+											"end": "\"",
+											"patterns": [{
+												"include": "#buildin-tags"
+											}]
+										}]
+									},
+									"2": {
+										"patterns": [{
+											"include": "#comment"
+										}]
+									},
+									"3":{
+										"patterns": [
+											{
+												"include": "#comment"
+											}
+										]
+									},
+									"4": {
+										"patterns": [{
+											"name": "string.quoted.double",
+											"begin": "\"",
+											"end": "\"",
+											"patterns": [{
+												"include": "#buildin-tag-values"
+											}]
+										}]
+									}
+								}
+							}
+						]
+					}
+				]
+			}]
+		},
+		"render-setup": {
+			"patterns": [{
+				"name": "support.property-value.render-setup.shaderlab",
+				"begin": "([_a-zA-Z][_a-zA-Z0-9]*)",
+				"end": "$",
+				"beginCaptures": {
+					"1": {
+						"patterns": [{
+							"include": "#buildin-props"
+						}]
+					}
+				},
+				"patterns": [
+					{
+						"include": "#comment"
+					},
+					{
+						"include": "#render-setup-values"
+					}
+				]
+			}]
+		},
+		"pass": {
+			"patterns": [{
+				"name": "meta.struct.pass.shaderlab",
+				"begin": "((?i)Pass)((?:\\s|/\\*(?!/).*\\*/)*)",
+				"end": "}",
+				"beginCaptures": {
+					"1": {
+						"patterns": [{
+							"include": "#struct-keyword"
+						}]
+					},
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					}
+				},
+				"patterns": [
+					{
+						"include": "#comment"
+					},
+					{
+						"include": "#tags"
+					},
+					{
+						"include": "#cg-block"
+					},
+					{
+						"include": "#render-setup"
+					}
+				]
+			}]
+		},
+		"cg-block": {
+			"patterns": [{
+				"name": "meta.block.cg.shaderlab",
+				"begin": "CGPROGRAM",
+				"end": "ENDCG",
+				"beginCaptures": {
+					"0": {
+						"patterns": [{
+							"include": "#keywords"
+						}]
+					}
+				},
+				"endCaptures": {
+					"0": {
+						"patterns": [{
+							"include": "#keywords"
+						}]
+					}
+				},
+				"patterns": [{
+					"include": "#code-global"
+				}]
+			}]
+		},
+		"code-global": {
+			"patterns": [{
+					"include": "#comment"
 				},
 				{
-					"include": "#comment"
+					"include": "#func-call"
+				},
+				{
+					"include": "#declare"
 				}
 			]
+		},
+		"fallback": {
+			"patterns": [{
+				"name": "support.property-value",
+				"begin": "((?i)FallBack)",
+				"end": "$",
+				"beginCaptures": {
+					"0": {
+						"patterns": [{
+							"include": "#buildin-props"
+						}]
+					}
+				},
+				"patterns": [
+					{
+						"include": "#strings"
+					}
+				]
+			}]
 		},
 		"prop-def": {
 			"name": "meta.definition.property.shaderlab",
@@ -146,7 +381,7 @@
 					"include": "#prop-type-dec"
 				},
 				{
-					"include": "#assignment"
+					"include": "#prop-assignment"
 				}
 			]
 		},
@@ -205,17 +440,17 @@
 		"numeric": {
 			"patterns": [{
 				"name": "constant.numeric.shaderlab",
-				"match": "[0-9]+(.[0-9]+)"
+				"match": "\\b([0-9]+\\.?[0-9]*)\\b"
 			}]
 		},
-		"assignment": {
+		"prop-assignment": {
 			"patterns": [{
-					"name": "keyword.operator.assignment.shaderlab",
+					"name": "keyword.operator.prop-assignment.shaderlab",
 					"match": "=(.+)",
 					"captures": {
 						"1": {
 							"patterns": [{
-									"include": "#expr"
+									"include": "#prop-expr"
 								},
 								{
 									"include": "#comment"
@@ -229,7 +464,7 @@
 				}
 			]
 		},
-		"expr": {
+		"prop-expr": {
 			"patterns": [{
 					"include": "#vector"
 				},
@@ -240,7 +475,12 @@
 					"include": "#strings"
 				},
 				{
-					"include": "#blocks"
+					"name": "meta.block.shaderlab",
+					"begin": "{",
+					"end": "}",
+					"patterns": [{
+						"include": "#prop-expr"
+					}]
 				},
 				{
 					"include": "#comment"
@@ -259,6 +499,343 @@
 					}
 				]
 			}]
+		},
+		"declare": {
+			"patterns": [{
+					"include": "#compile-statement"
+				},
+				{
+					"include": "#struct-declare"
+				},
+				{
+					"include": "#func-declare"
+				},
+				{
+					"include": "#var-declare"
+				}
+			]
+		},
+		"compile-statement": {
+			"patterns": [{
+				"name": "meta.preprocessor.shaderlab",
+				"begin": "#pragma",
+				"end": "$",
+				"beginCaptures": {
+					"0": {
+						"name": "keyword.control.pragma.shaderlab"
+					}
+				},
+				"patterns": [{
+						"include": "#comment"
+					},
+					{
+						"begin": "(surface|target|vertex|fragment)",
+						"end": "$",
+						"beginCaptures": {
+							"0": {
+								"name": "keyword.other.unit.shaderlab"
+							}
+						},
+						"patterns": [{
+								"include": "#comment"
+							},
+							{
+								"begin": "\\b[_a-zA-Z][_a-zA-Z0-9]*\\b",
+								"end": "$",
+								"beginCaptures": {
+									"0": {
+										"name": "entity.name.function"
+									}
+								},
+								"patterns": [{
+										"include": "#comment"
+									},
+									{
+										"match": "\\b[_a-zA-Z][_a-zA-Z0-9]*\\b"
+									}
+								]
+							},
+							{
+								"include": "#numeric"
+							}
+						]
+					}
+				]
+			}]
+		},
+		"struct-declare": {
+			"patterns": [{
+				"name": "meta.class-struct-block.shaderlab",
+				"begin": "\\bstruct\\b",
+				"end": "$",
+				"beginCaptures": {
+					"0": {
+						"name": "storage.type.shaderlab"
+					}
+				},
+				"patterns": [{
+						"include": "#comment"
+					},
+					{
+						"include": "#declare-block"
+					}
+				]
+			}]
+		},
+		"var-declare": {
+			"patterns": [{
+				"name": "meta.var.declare",
+				"match": "(\\b[_a-zA-Z][_a-zA-Z0-9]*\\b)((?:\\s|/\\*(?!/).*\\*/)+)(\\b[_a-zA-Z][_a-zA-Z0-9]*\\b)((?:\\s|/\\*(?!/).*\\*/)*)(\\:(?:[_a-zA-Z][_a-zA-Z0-9]*))?",
+				"captures": {
+					"1": {
+						"patterns": [{
+							"include": "#type"
+						}]
+					},
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					},
+					"3": {
+						"patterns": [{
+							"include": "#identifier"
+						}]
+					},
+					"4": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					},
+					"5": {
+						"patterns": [{
+							"include": "#semantics"
+						}]
+					}
+				}
+			}]
+		},
+		"macro-func-call": {
+			"patterns": [{
+				"name": "meta.function-call.shaderlab",
+				"begin": "\\b([_a-zA-Z][_a-zA-Z0-9]*)\\b(?:\\s*)\\(",
+				"end": "\\)",
+				"beginCaptures": {
+					"1": {
+						"name": "entity.name.function"
+					}
+				},
+				"patterns": [{
+					"include": "#ref"
+				}]
+			}]
+		},
+		"ref": {
+			"patterns": [{
+				"include": "#identifier"
+			}]
+		},
+		"type": {
+			"patterns": [{
+				"include": "#buildin-types"
+			}, {
+				"name": "entity.name.type.shaderlab",
+				"match": "\\b[_a-zA-Z][_a-zA-Z0-9]*\\b"
+			}]
+		},
+		"declare-block": {
+			"patterns": [{
+				"begin": "{",
+				"end": "}",
+				"patterns": [
+					{
+						"include": "#comment"
+					},
+					{
+					"include": "#var-declare"
+				}]
+			}]
+		},
+		"semantics": {
+			"patterns": [{
+				"begin": "\\:",
+				"end": "_a-zA-Z0-9",
+				"patterns": [{
+						"include": "#comment"
+					},
+					{
+						"include": "#type"
+					}
+				]
+			}]
+		},
+		"func-declare": {
+			"patterns": [{
+				"name": "meta.function.shaderlab",
+				"begin": "([_a-zA-Z][_a-zA-Z0-9]*)((?:\\s|/\\*(?!/).*\\*/)+)([_a-zA-Z][_a-zA-Z0-9]*)((?:\\s|/\\*(?!/).*\\*/)*)(\\((?:(?:[^/]|/(?![*/]))*)(?:(?:/\\*.*?\\*/)(?:(?:[^/]|/(?!\\*))*))*\\))((?:\\s|/\\*(?!/).*\\*/)*)(\\:(?:[_a-zA-Z][_a-zA-Z0-9]*))?",
+				"end": "$",
+				"captures": {
+					"1": {
+						"patterns": [{
+							"include": "#type"
+						}]
+					},
+					"2": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					},
+					"3": {
+						"name": "entity.name.function.shaderlab",
+						"patterns": [{
+							"include": "#identifier"
+						}]
+					},
+					"4": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					},
+					"5": {
+						"patterns": [{
+							"include": "#params-declare"
+						}]
+					},
+					"6": {
+						"patterns": [{
+							"include": "#comment"
+						}]
+					},
+					"7": {
+						"patterns": [{
+							"include": "#semantics"
+						}]
+					}
+				},
+				"patterns": [{
+						"include": "#blocks"
+					},
+					{
+						"include": "#comment"
+					}
+				]
+			}]
+		},
+		"params-declare": {
+			"patterns": [{
+				"name": "meta.function.parameters",
+				"begin": "\\(",
+				"end": "\\)",
+				"patterns": [{
+						"include": "#keywords"
+					},
+					{
+						"include": "#var-declare"
+					}
+				]
+			}]
+		},
+		"blocks": {
+			"patterns": [
+				{
+					"name": "meta.block.shaderlab",
+					"begin": "{",
+					"end": "}",
+					"patterns": [
+						{
+							"include": "#comment"
+						},
+						{
+							"include": "#var-declare"
+						},
+						{
+							"include": "#blocks"
+						},
+						{
+							"include": "#keywords-control"
+						},
+						{
+							"include": "#expr"
+						}
+					]
+				}
+
+			]
+		},
+		"expr":{
+			"patterns": [
+				{
+					"include": "#comment"
+				},
+				{
+					"include": "#numeric"
+				},
+				{
+					"include": "#func-call"
+				},
+				{
+					"include": "#identifier"
+				},
+				{
+					"include": "#operators"
+				}
+			]
+		},
+		"keywords-control":{
+			"patterns": [
+				{
+					"name":"keyword.control.shaderlab",
+					"match": "\\b(if|while|for|else|break|continue)\\b"
+				}
+			]
+		},
+		"func-call":{
+			"patterns": [
+				{
+					"match": "([_a-zA-Z][_a-zA-Z0-9]*)((?:\\s|/\\*(?!/).*\\*/)*)(\\((([^/]|/(?!\\*))*)((/\\*.*?\\*/)(([^/]|/(?![*/]))*))*\\))",
+					"captures": {
+						"1":{
+							"name":"entity.name.function.shaderlab",
+							"patterns": [
+								{
+									"include": "#buildin-types"
+								}
+							]
+						},
+						"2":{
+							"patterns": [
+								{
+									"include": "#comment"
+								}
+							]
+						},
+						"3":{
+							"name":"meta.function.parameters.shaderlab",
+							"patterns": [
+								{
+									"include": "#params"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		"params":{
+			"patterns": [
+				{
+					"include": "#expr"
+				}
+			]
+		},
+		"operators":{
+			"patterns": [
+				{
+					"name":"keyword.operator.shaderlab",
+					"match": "[+\\-\\*/<>?!.]"
+				}
+			]
 		}
+
 	}
 }
