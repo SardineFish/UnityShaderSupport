@@ -1,7 +1,7 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "ShaderLab",
-	"scopeName": "source.shader",
+	"scopeName": "source.shaderlab",
 	"patterns": [{
 		"include": "#shader-def"
 	}, {

@@ -19,7 +19,7 @@
         }],
         "grammars": [{
             "language": "shaderlab",
-            "scopeName": "source.shader",
+            "scopeName": "source.shaderlab",
             "path": "./syntaxes/shaderlab.tmLanguage.json"
         }]
     }
