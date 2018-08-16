@@ -1,7 +1,7 @@
 {
     "name": "unityshader-intellisense",
-    "displayName": "UnityShader Intellisense",
-    "description": "Auto complete support to Unity shader",
+    "displayName": "UnityShader Support",
+    "description": "Syntax highlight support to Unity shader",
     "version": "0.0.1",
     "publisher": "SardineFish",
     "engines": {
@@ -14,7 +14,7 @@
         "languages": [{
             "id": "shaderlab",
             "aliases": ["ShaderLab", "shaderlab"],
-            "extensions": [".shader",".cginc",".glslinc"],
+            "extensions": [".shader"],
             "configuration": "./language-configuration.json"
         }],
         "grammars": [{
