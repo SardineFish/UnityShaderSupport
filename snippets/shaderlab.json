@@ -1,0 +1,26 @@
+{
+    "Shader":{
+        "prefix": "Shader",
+        "body": [
+            "Shader \"${1:Custom/NewShader}\" {",
+            "\tProperties {",
+            "\t\t",
+            "\t}",
+            "\tSubShader {",
+            "\t\t$0",
+            "\t}",
+            "\tFallBack \"Diffuse\"",
+            "\t",
+            "}"
+        ],
+        "description": "Shader Structure"
+    },
+    "SubShader":{
+        "prefix":"SubShader",
+        "body":[
+            "SubShader {",
+            "\t$0",
+            "}"
+        ]
+    }
+}

@@ -21,6 +21,12 @@
             "language": "shaderlab",
             "scopeName": "source.shaderlab",
             "path": "./syntaxes/shaderlab.tmLanguage.json"
-        }]
+        }],
+        "snippets": [
+            {
+                "language": "shaderlab",
+                "path": "./snippets/shaderlab.json"
+            }
+        ]
     }
 }
