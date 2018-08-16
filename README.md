@@ -9,6 +9,7 @@ An extension for VS Code to provide language support for Unity Shader
 - Syntax highlight support
 - Snippets
 
+![](https://cdn-img.sardinefish.com/NTkxNjU4)
 
 ## TODO
 - Intellisence for ShaderLab
