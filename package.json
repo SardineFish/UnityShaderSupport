@@ -2,7 +2,7 @@
     "name": "unityshader-intellisense",
     "displayName": "UnityShader Support",
     "description": "Syntax highlight support to Unity shader",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "publisher": "SardineFish",
     "engines": {
         "vscode": "^1.26.0"
@@ -11,17 +11,26 @@
         "Programming Languages"
     ],
     "contributes": {
-        "languages": [{
-            "id": "shaderlab",
-            "aliases": ["ShaderLab", "shaderlab"],
-            "extensions": [".shader"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "shaderlab",
-            "scopeName": "source.shaderlab",
-            "path": "./syntaxes/shaderlab.tmLanguage.json"
-        }],
+        "languages": [
+            {
+                "id": "shaderlab",
+                "aliases": [
+                    "ShaderLab",
+                    "shaderlab"
+                ],
+                "extensions": [
+                    ".shader"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "shaderlab",
+                "scopeName": "source.shaderlab",
+                "path": "./syntaxes/shaderlab.tmLanguage.json"
+            }
+        ],
         "snippets": [
             {
                 "language": "shaderlab",
