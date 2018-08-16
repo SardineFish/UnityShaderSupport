@@ -2,7 +2,7 @@
     "name": "unityshader-intellisense",
     "displayName": "UnityShader Support",
     "description": "Syntax highlight support to Unity shader",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "publisher": "SardineFish",
     "engines": {
         "vscode": "^1.26.0"
