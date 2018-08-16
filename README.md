@@ -4,7 +4,10 @@ An extension for VS Code to provide language support for Unity Shader
 
 *still in development*
 
-## Implement
+## Requirements
+- VS Code 1.26.0
+
+## Features
 - Grammar analyze
 - Syntax highlight support
 - Snippets

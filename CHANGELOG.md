@@ -13,3 +13,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [1.0.1] - 2018-8-16
 ### Changed
 - Fix bugs.
+
+## [1.0.2] - 2018-8-16
+### Changed
+- Update README
