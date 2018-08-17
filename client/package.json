@@ -4,7 +4,11 @@
   "description": "The Client of language server",
   "scripts": {
     "build": "tsc",
-    "build:watch": "tsc -w"
+    "build:watch": "tsc -w",
+    "postinstall": "node ./node_modules/vscode/bin/install"
+  },
+  "engines": {
+    "vscode": "^1.26.0"
   },
   "author": "SardineFish",
   "license": "MIT",

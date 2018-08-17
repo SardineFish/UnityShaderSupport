@@ -14,7 +14,7 @@
     "scripts": {
         "build:client": "tsc -p ./client/tsconfig.json",
         "build:server": "tsc -p ./server/tsconfig.json",
-        "build":"npm run build:client && npm run build:server",
+        "build": "npm run build:client && npm run build:server",
         "prestart": "npm run build"
     },
     "main": "./client/out/extension",
@@ -50,6 +50,7 @@
         ]
     },
     "devDependencies": {
+        "@types/node": "^10.7.1",
         "typescript": "^3.0.1"
     }
 }
