@@ -1,0 +1,14 @@
+{
+  "name": "unityshader-intellisence-server",
+  "version": "1.0.0",
+  "description": "The server of a language server",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w"
+  },
+  "author": "SardineFish",
+  "license": "MIT",
+  "dependencies": {
+    "vscode-languageserver": "^5.0.0"
+  }
+}

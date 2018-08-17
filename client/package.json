@@ -1,0 +1,16 @@
+{
+  "name": "unityshader-intellisence-client",
+  "version": "1.0.0",
+  "description": "The Client of language server",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w"
+  },
+  "author": "SardineFish",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {
+    "vscode": "^1.1.21",
+    "vscode-languageclient": "^5.0.0"
+  }
+}

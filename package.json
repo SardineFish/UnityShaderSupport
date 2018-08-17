@@ -11,6 +11,16 @@
     "categories": [
         "Programming Languages"
     ],
+    "scripts": {
+        "build:client": "tsc -p ./client/tsconfig.json",
+        "build:server": "tsc -p ./server/tsconfig.json",
+        "build":"npm run build:client && npm run build:server",
+        "prestart": "npm run build"
+    },
+    "main": "./client/out/extension",
+    "activationEvents": [
+        "onLanguage:shaderlab"
+    ],
     "contributes": {
         "languages": [
             {
@@ -38,5 +48,8 @@
                 "path": "./snippets/shaderlab.json"
             }
         ]
+    },
+    "devDependencies": {
+        "typescript": "^3.0.1"
     }
 }
