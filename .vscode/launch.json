@@ -6,10 +6,24 @@
 	"version": "0.2.0",
     "configurations": [
         {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach to Server",
+            "port": 6009,
+            "address": "localhost",
+            "protocol": "inspector",
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceRoot}/server/out/**/*.js"
+            ]
+        },
+        {
             "type": "extensionHost",
             "request": "launch",
             "name": "Run Extension",
             "runtimeExecutable": "${execPath}",
+            "stopOnEntry": false,
+            "sourceMaps": true,
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}"
             ],

@@ -6,6 +6,9 @@
     "build": "tsc",
     "build:watch": "tsc -w"
   },
+  "engines": {
+    "node": "*"
+  },
   "author": "SardineFish",
   "license": "MIT",
   "dependencies": {
