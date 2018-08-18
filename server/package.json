@@ -12,6 +12,7 @@
   "author": "SardineFish",
   "license": "MIT",
   "dependencies": {
+    "linq": "^3.1.0",
     "vscode-languageserver": "^5.0.0"
   }
 }

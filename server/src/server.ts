@@ -1,30 +1,18 @@
 "use strict";
 
 import { createConnection, ProposedFeatures, TextDocuments, InitializeParams, DidChangeConfigurationNotification, TextDocument, TextDocumentPositionParams, CompletionItem, CompletionParams, CompletionItemKind } from "vscode-languageserver";
-import { promises } from "fs";
+import { ShaderCode } from "./grammar";
 
-let connection = createConnection(ProposedFeatures.all);
 
-let documents: TextDocuments = new TextDocuments()
+const connection = createConnection(ProposedFeatures.all);
 
-let hasConfigurationCapability: boolean | undefined = false;
-let hasWorkspaceFolderCapability: boolean | undefined = false;
-let hasDiagnosticRelatedInformationCapability: boolean | undefined = false;
+const documents: TextDocuments = new TextDocuments();
+
+let documentList = new Map<string, TextDocument>();
 
 connection.onInitialize((params: InitializeParams) =>
 {
-
-    let capabilities = params.capabilities;
-
-    hasConfigurationCapability =
-        capabilities.workspace && !!capabilities.workspace.configuration;
-    hasWorkspaceFolderCapability =
-        capabilities.workspace && !!capabilities.workspace.workspaceFolders;
-    hasDiagnosticRelatedInformationCapability =
-        capabilities.textDocument &&
-        capabilities.textDocument.publishDiagnostics &&
-        capabilities.textDocument.publishDiagnostics.relatedInformation;
-
+    connection.console.log("Init Server");
     return {
         capabilities: {
             textDocumentSync: documents.syncKind,
@@ -35,48 +23,30 @@ connection.onInitialize((params: InitializeParams) =>
     };
 });
 
-connection.onInitialized(() =>
+documents.onDidOpen(e =>
 {
-    // Register for all configuration changes.
-    if (hasConfigurationCapability)
-    {
-        connection.client.register(DidChangeConfigurationNotification.type, undefined);
-    }
-
-    if (hasWorkspaceFolderCapability)
-    {
-        connection.workspace.onDidChangeWorkspaceFolders(_event =>
-        {
-
-        });
-    }
-});
-
-connection.onDidChangeConfiguration(change =>
-{
-
+    documentList.set(e.document.uri, e.document);
 });
 
 documents.onDidClose(e =>
 {
-
+    documentList.delete(e.document.uri);
 });
 
-async function validateTextDocument(doc: TextDocument): Promise<void>
+function getDocument(uri: string)
 {
-
+    return documentList.get(uri);
 }
+
 
 connection.onCompletion((docPos: CompletionParams): CompletionItem[] =>
 {
-    return [{
-        label: "Shader",
-        kind: CompletionItemKind.Keyword
-    },
+    let doc = getDocument(docPos.textDocument.uri);
+    if (doc)
     {
-        label: "SubShader",
-        kind: CompletionItemKind.Struct
-    }];
+        let code = new ShaderCode(doc);
+    }
+    return [];
 });
 
 documents.listen(connection);

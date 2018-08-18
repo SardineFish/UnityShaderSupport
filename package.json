@@ -15,7 +15,10 @@
         "build:client": "tsc -p ./client/tsconfig.json",
         "build:server": "tsc -p ./server/tsconfig.json",
         "build": "npm run build:client && npm run build:server",
-        "prestart": "npm run build"
+        "prestart": "npm run build",
+        "watch:client": "tsc -w -p ./client/tsconfig.json",
+        "watch:server": "tsc -w -p ./server/tsconfig.json",
+        "watch": "npm run watch:client && npm run watch:server"
     },
     "main": "./client/out/extension",
     "activationEvents": [
