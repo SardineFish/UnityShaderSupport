@@ -1,0 +1,36 @@
+Shader <name>
+{
+	Properties 
+	{
+		<identifier> (<name>, <type>) = <defaultValue>
+	}
+}
+
+
+<identifier>
+<(>
+<displayName> -	<string>
+<,>
+<propType> ----	<typeName>
+		        [] ----	<(>
+		        		<number>
+		        		[...] ---------	<,>
+		        				        <number>
+		        		<)>
+<)>
+<=>
+<defaultValue> 	[]		<number>
+		        []		<string>
+		        		<{>
+		        		<any>
+		        		<}>
+		        []		<(>
+		        		<number>
+		        		<,>
+		        		<number>
+		        		<,>
+		        		<number>
+		        		<,>
+		        		<number>
+		        		<)>
+				

@@ -187,8 +187,9 @@ enum MatchResult
 abstract class PatternItem
 {
     parent?: NestedPattern;
+    ignorable?: boolean = false;
     pattern: GrammarPattern;
-    abstract isMatch(char: string): MatchResult;
+    abstract isMatch(char: string, index: number, text: string): boolean;
     moveNext(): PatternItem
     {
         if (this.parent)
@@ -208,7 +209,7 @@ class TextPattern extends PatternItem
     currentIdx: number = 0;
     isMatch(char: string)
     {
-        return char === this.text[this.currentIdx] ? 1 : 0;
+        return char === this.text[this.currentIdx];
     }
     moveNext(): PatternItem
     {
@@ -228,7 +229,7 @@ class CharSetPattern extends PatternItem
     private _originalCount = 1;
     isMatch(char: string)
     {
-        return this.charSet.indexOf(char) >= 0 ? 1 : 0;
+        return this.charSet.indexOf(char) >= 0;
     }
     moveNext():PatternItem
     {
@@ -243,15 +244,16 @@ class CharSetPattern extends PatternItem
 }
 class EmptyPattern extends PatternItem
 {
-    ignorable: boolean = true;
     isMatch(char: string)
     {
+        /*
         if (char === " " || char === "\r" || char === "\n")
             return 1;
         if (this.ignorable)
             return MatchResult.Skip;
         return 0;
-        
+        */
+        return char === " " || char === "\r" || char === "\n";
     }
     reset() { }
 }
@@ -260,9 +262,9 @@ class NestedPattern extends PatternItem
     subPatterns: PatternItem[] = [];
     currentIdx: number = 0;
 
-    isMatch(char: string)
+    isMatch(char: string, index: number, text: string)
     {
-        return this.subPatterns[this.currentIdx].isMatch(char);
+        return this.subPatterns[this.currentIdx].isMatch(char, index, text);
     }
     getChildren(idx: number = 0): PatternItem
     {
@@ -287,6 +289,95 @@ class NestedPattern extends PatternItem
     {
         this.subPatterns.forEach(pattern => pattern.reset());
         this.currentIdx = 0;
+    }
+}
+class StringPattern extends PatternItem{
+    begin: boolean = false;
+    slash: boolean = false;
+    end: boolean = false;
+    isMatch(char: string)
+    {
+        if (this.end)
+            return false;
+        if (char === "\\")
+        {
+            this.slash = true;
+            return this.begin;
+        }
+        if (this.slash)
+        {
+            this.slash = false;
+            return this.begin;
+        }
+        if (this.begin)
+        {
+            if (char === "\"")
+            {
+                this.end = true;
+                return true;
+            }
+            return true;
+        }
+        else if (char === "\"")
+        {
+            this.begin = true;
+        }
+        else
+            return false;
+    }
+    reset(): void
+    {
+        this.begin = false;
+        this.slash = false;
+        this.end = false;
+    }
+}
+class NumberPattern extends PatternItem
+{
+    isMatch(char: string, index: number, text: string)
+    {
+        if (text.substr(index).search(/[+-]?[0-9]?(\.[0-9]+)?/) === 0)
+        {
+            return true;
+        }
+        return false;
+    }
+    reset(): void
+    {
+        throw new Error("Method not implemented.");
+    }
+
+
+}
+class IdentifierPattern extends PatternItem
+{
+    isMatch(char: string):boolean
+    {
+        throw new Error("Method not implemented.");
+    }
+    reset(): void
+    {
+        throw new Error("Method not implemented.");
+    }
+
+    
+}
+class PatternScope extends PatternItem
+{
+    scope: GrammarScope;
+    isMatch(char: string, index: number, text: string): boolean
+    {
+        throw new Error("Method not implemented.");
+    }
+    reset(): void
+    {
+        throw new Error("Method not implemented.");
+    }
+
+    constructor(pattern: GrammarPattern, scope: GrammarScope)
+    {
+        super(pattern);
+        this.scope = scope;
     }
 }
 class PatternDictionary
@@ -315,10 +406,9 @@ class GrammarPattern
     dictionary?: PatternDictionary;
     name?: string;
     scopes?: PatternScopeDictionary;
-    _compiledPattern?: [];
+    _compiledPattern?: NestedPattern[];
 }
-
-class GrammarDeclare extends GrammarScope
+class GrammarDeclare
 {
     patterns?: GrammarPattern[];
     name?: string;
@@ -326,10 +416,66 @@ class GrammarDeclare extends GrammarScope
     stringDelimiter?: string[];
     pairMatch?: string[][];
 }
-
-function compileGrammar(pattern: GrammarPattern)
+function analysePatternItem(item: string,pattern:GrammarPattern): PatternItem
 {
-    
+    const bracketChars = [" ", "<", ">", "[", "]", "{", "}"];
+    const spaceChars = [" "];
+    const isBracket = (chr: string): boolean => bracketChars.indexOf(chr) >= 0;
+    const isSpace = (chr: string): boolean => spaceChars.indexOf(chr) >= 0;
+    const buildInPattern: any = {
+        "string": (pt: GrammarPattern) => new StringPattern(pt),
+        "number": (pt: GrammarPattern) => new NumberPattern(pt),
+        "identifier": (pt: GrammarPattern) => new IdentifierPattern(pt),
+    }
+    let bracketDepth = 0;
+    let startBracket = "";
+    let words = "";
+    let patternItem: PatternItem;
+    if (item[0] === "<" && item[item.length - 1] === ">")
+    {
+        let name = item.substr(1, item.length - 2);
+        if (buildInPattern[name])
+            return buildInPattern;
+        if (pattern.dictionary[name])
+            return compileGrammar(pattern.dictionary[name]);
+        return new IdentifierPattern(pattern);
+    }
+    else if (item[0] === "[" && item[item.length - 1] === "]")
+    {
+        patternItem = new NestedPattern(pattern);
+        item = item.substr(1, item.length - 2);
+    }
+    else if (item[0] === "{" && item[item.length - 1] === "}")
+    {
+        let name = item.substr(1, item.length - 2);
+        let scope = pattern.scopes[name];
+        if (!scope)
+            throw new IdentifierPattern(pattern);
+        return new PatternScope(pattern, scope);
+    }
+
+    for (let i = 0; i < item.length; i++)
+    {
+        if (isSpace(item[i]))
+        {
+            if (bracketDepth === 0)
+            {
+                if (words === "")
+                    continue;
+
+            }
+        }
+    }
+}
+function compileGrammar(pattern: GrammarPattern):PatternItem
+{
+    if (pattern === GrammarPattern.String)
+        return new StringPattern(pattern);
+    let patternList:PatternItem[] = [];
+    pattern.patterns.forEach(pt =>
+    {
+        patternList.push(analysePatternItem(pt));
+    });
 }
 function grammarMatch(grammar: GrammarDeclare, doc: TextDocument)
 {
