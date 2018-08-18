@@ -1,6 +1,7 @@
-import { Scope, ScopeDeclare } from "./grammar";
+import { ScopeDeclare } from "./grammar";
+import { DiagnosticSeverity, Diagnostic } from "vscode-languageserver";
 
-class SourceShaderLab extends Scope
+/*class SourceShaderLab extends Scope
 {
     scopes: Scope[] = [];
     startOffset: number = 0;
@@ -8,64 +9,27 @@ class SourceShaderLab extends Scope
     start: RegExp = /Shader.*{/i;
     end: RegExp = /}/;
 
-}
-class ShaderScope extends Scope
-{
-
-}
-class SubShaderScope extends Scope
-{
-
-}
-class PassScope extends Scope
-{
-
-}
-class TagScope extends Scope
-{
-
-}
-class PropertiesScope extends Scope
-{
-
-}
-class CgScope extends Scope
-{
-
-}
-class CgCodeScope extends Scope
-{
-
-}
-class StructScope extends Scope
-{
-
-}
-
-
+}*/
+const DiagnosticSource: string = "ShaderLab Intellicense";
 const blockScope: ScopeDeclare = {
     name: "Block",
     begin: /{/,
-    end: /}/,
-    scopeType: Scope
+    end: /}/
 };
 const tagScope: ScopeDeclare = {
     name: "Tags",
     begin: /Tags.*{/i,
-    end: /}/,
-    scopeType: TagScope
+    end: /}/
 };
 const cgScope: ScopeDeclare = {
     name: "Cg Program",
     begin: /CGPROGRAM/,
-    end: /ENDCG/,
-    scopeType: CgCodeScope
+    end: /ENDCG/
 };
 const passDeclare: ScopeDeclare = {
     name: "Pass",
     begin: /Pass.*{/i,
     end: /}/,
-    scopeType: PassScope,
     scopes: [
         tagScope,
         cgScope,
@@ -78,25 +42,43 @@ const sourceShaderLab: ScopeDeclare = {
             name: "ShaderBlock",
             begin: /Shader.*{/i,
             end: /}/,
-            scopeType: ShaderScope,
+            patterns: [
+                {
+                    match: /(Shader)\s+(\".*\")?\s*{/i,
+                    captures: {
+                        "1": {
+                            unmatched: {
+                                severity: DiagnosticSeverity.Error,
+                                message: "Shader name required.",
+                                source: DiagnosticSource
+                            }
+                        }
+                    }
+                },
+                {
+                    match: /Properties\s*$/i,
+                    diagnostic: {
+                        severity: DiagnosticSeverity.Error,
+                        message: "Missing {",
+                        source: DiagnosticSource
+                    } 
+                }
+            ],
             scopes: [
                 {
                     name: "Properties",
                     begin: /Properties.*{/i,
                     end: /}/,
-                    scopeType: PropertiesScope,
                     scopes: [{
                         name: "Block Value",
                         begin: /{/,
                         end: /}/,
-                        scopeType: Scope
                     }]
                 },
                 {
                     name: "SubShader",
                     begin: /SubShader.*{/i,
                     end: /}/,
-                    scopeType: SubShaderScope,
                     scopes: [
                         tagScope,
                         passDeclare,
@@ -106,8 +88,7 @@ const sourceShaderLab: ScopeDeclare = {
                 }
             ]
         }
-    ],
-    scopeType: SourceShaderLab
+    ]
 }
 
-export { sourceShaderLab, SourceShaderLab };
+export default sourceShaderLab;

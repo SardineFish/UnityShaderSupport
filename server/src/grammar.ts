@@ -1,6 +1,9 @@
-import { TextDocument, Position, TextDocumentItem, LogMessageNotification } from "vscode-languageserver";
+import { TextDocument, Position, TextDocumentItem, LogMessageNotification, CompletionItem, Diagnostic, Range } from "vscode-languageserver";
 import linq from "linq";
-import { sourceShaderLab } from "./shaderlab.grammar";
+import sourceShaderLab from "./shaderlab.grammar";
+
+type DocumentCompletionCallback = () => CompletionItem[];
+type DocumentDiagnoseCallback = (range:Range) => Diagnostic[];
 
 class Code
 {
@@ -12,8 +15,10 @@ class Scope
     startOffset: number = 0;
     endOffset: number = 0;
     scopes: Scope[] = [];
-    constructor(doc: TextDocument)
+    scopeDeclare: ScopeDeclare;
+    constructor(doc: TextDocument, declare:ScopeDeclare)
     {
+        this.scopeDeclare = declare;
         this.document = doc;
     }
     get startPosition() { return this.document.positionAt(this.startOffset); }
@@ -34,9 +39,32 @@ class ScopeDeclare
     begin?: RegExp;
     end?: RegExp;
     scopes?: ScopeDeclare[];
-    scopeType: typeof Scope;
     _matchbegin?: RegExpMatchArray;
     _matchEnd?: RegExpExecArray;
+    patterns?: PatternDeclare[] = [];
+}
+class MatchCapturePattern
+{
+    name?: string;
+    match?: RegExp;
+    default?: boolean = false;
+    captures?: MatchCaptures = new MatchCaptures();
+    onCompletion?: DocumentCompletionCallback;
+}
+class MatchCaptures
+{
+    [key: string]: PatternDeclare;
+}
+class PatternDeclare
+{
+    name?: string;
+    match?: RegExp;
+    default?: boolean = false;
+    //patterns?: PatternDeclare[] = [];
+    captures?: MatchCaptures = new MatchCaptures();
+    onCompletion?: DocumentCompletionCallback;
+    diagnostic?: Diagnostic;
+    unmatched?: Diagnostic;
 }
 function matchInRange(reg: RegExp, doc: TextDocument, start: number, end: number): RegExpExecArray
 {
@@ -58,7 +86,7 @@ function scopeMatch(scopeDeclare: ScopeDeclare, doc: TextDocument, startOffset: 
             nextStartOffset = startOffset + match.index + match[0].length;
         }
     }
-    let scope = new scopeDeclare.scopeType(doc);
+    let scope = new Scope(doc, scopeDeclare);
     if (match)
         scope.startOffset = startOffset + match.index;
 
@@ -120,6 +148,33 @@ function scopeMatch(scopeDeclare: ScopeDeclare, doc: TextDocument, startOffset: 
     }
     return scope;
 
+}
+
+function diagnostic(pattern: PatternDeclare, doc: TextDocument, startOffset: number, endOffset: number): Diagnostic[]
+{
+    let diagnostics: Diagnostic[] = [];
+    if (pattern.match)
+    {
+        let match = matchInRange(pattern.match, doc, startOffset, endOffset);
+        if (pattern.captures)
+        {
+            for (let i = 0; i < match.length; i++)
+            {
+                if (!pattern.captures[i])
+                    continue;
+                
+                // Handle unmatch diagnostic
+                if (match[i] === undefined && pattern.captures[i].unmatched)
+                {
+                    let diag = pattern.captures[i].unmatched;
+                    diag.range = { start: doc.positionAt(startOffset + match.index), end: doc.positionAt(startOffset + match.index + match[0].length) };
+                    diagnostics.push(diag);
+                }
+
+                
+            }
+        }
+    }
 }
 
 

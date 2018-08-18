@@ -96,7 +96,7 @@
 		"shader-def": {
 			"patterns": [{
 				"name": "meta.namespace.shaderlab",
-				"begin": "((?i)Shader)((?:\\s|/\\*(?!/).*\\*/)*)(\".*\")((?:\\s|/\\*(?!/).*\\*/)*)",
+				"begin": "(\\b(?i)Shader\\b)((?:\\s|/\\*(?!/).*\\*/)*)(\".*\")?((?:\\s|/\\*(?!/).*\\*/)*)",
 				"end": "}",
 				"beginCaptures": {
 					"1": {
