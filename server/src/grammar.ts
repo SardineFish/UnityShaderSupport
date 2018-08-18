@@ -3,7 +3,7 @@ import linq from "linq";
 import sourceShaderLab from "./shaderlab.grammar";
 
 type DocumentCompletionCallback = () => CompletionItem[];
-type DocumentDiagnoseCallback = (range:Range) => Diagnostic[];
+type DocumentDiagnoseCallback = (text: string, range: Range) => Diagnostic[];
 
 class Code
 {
@@ -171,11 +171,173 @@ function diagnostic(pattern: PatternDeclare, doc: TextDocument, startOffset: num
                     diagnostics.push(diag);
                 }
 
-                
+
             }
         }
     }
+    return diagnostics;
 }
 
+enum MatchResult
+{
+    NotMatched = 0,
+    Matched = 1,
+    Skip = 2,
+}
+abstract class PatternItem
+{
+    parent?: NestedPattern;
+    pattern: GrammarPattern;
+    abstract isMatch(char: string): MatchResult;
+    moveNext(): PatternItem
+    {
+        if (this.parent)
+            return this.parent.moveNext();
+        return null;
+    }
+    abstract reset(): void;
+    constructor(pattern: GrammarPattern)
+    {
+        this.pattern = pattern;
+    }
+}
 
-export { ShaderCode, Scope, ScopeDeclare };
+class TextPattern extends PatternItem
+{
+    text: string;
+    currentIdx: number = 0;
+    isMatch(char: string)
+    {
+        return char === this.text[this.currentIdx] ? 1 : 0;
+    }
+    moveNext(): PatternItem
+    {
+        if (++this.currentIdx < this.text.length)
+            return this;
+        return super.moveNext();
+    }
+    reset()
+    {
+        this.currentIdx = 0;
+    }
+}
+class CharSetPattern extends PatternItem
+{
+    charSet: string[];
+    count: number = 1;
+    private _originalCount = 1;
+    isMatch(char: string)
+    {
+        return this.charSet.indexOf(char) >= 0 ? 1 : 0;
+    }
+    moveNext():PatternItem
+    {
+        if (--this.count > 0)
+            return this;
+        return super.moveNext();
+    }
+    reset()
+    {
+        this.count = this._originalCount;
+    }
+}
+class EmptyPattern extends PatternItem
+{
+    ignorable: boolean = true;
+    isMatch(char: string)
+    {
+        if (char === " " || char === "\r" || char === "\n")
+            return 1;
+        if (this.ignorable)
+            return MatchResult.Skip;
+        return 0;
+        
+    }
+    reset() { }
+}
+class NestedPattern extends PatternItem
+{
+    subPatterns: PatternItem[] = [];
+    currentIdx: number = 0;
+
+    isMatch(char: string)
+    {
+        return this.subPatterns[this.currentIdx].isMatch(char);
+    }
+    getChildren(idx: number = 0): PatternItem
+    {
+        if (this.subPatterns[idx])
+        {
+            if (this.subPatterns[idx] instanceof NestedPattern)
+                return (<NestedPattern>this.subPatterns[idx]).getChildren(0);
+            else
+                return this.subPatterns[idx];
+        }
+        return null;
+    }
+    moveNext(): PatternItem
+    {
+        if (++this.currentIdx < this.subPatterns.length)
+            return this.getChildren(this.currentIdx);
+        else if (this.parent)
+            return this.parent.moveNext();
+        return null;
+    }
+    reset()
+    {
+        this.subPatterns.forEach(pattern => pattern.reset());
+        this.currentIdx = 0;
+    }
+}
+class PatternDictionary
+{
+    [key: string]: GrammarPattern;
+}
+class PatternScopeDictionary
+{
+    [key: string]: GrammarScope;
+}
+class GrammarScope
+{
+    begin: string;
+    end: string;
+    patterns?: GrammarPattern[];
+    scopes?: GrammarScope[];
+    name?: string;
+    ignore?: GrammarPattern;
+    pairMatch?: string[][];
+}
+class GrammarPattern
+{
+    static String: GrammarPattern = { patterns: ["\"[string]\""], name: "String" };
+    patterns: string[];
+    caseInsensitive?: boolean = false;
+    dictionary?: PatternDictionary;
+    name?: string;
+    scopes?: PatternScopeDictionary;
+    _compiledPattern?: [];
+}
+
+class GrammarDeclare extends GrammarScope
+{
+    patterns?: GrammarPattern[];
+    name?: string;
+    ignore?: GrammarPattern;
+    stringDelimiter?: string[];
+    pairMatch?: string[][];
+}
+
+function compileGrammar(pattern: GrammarPattern)
+{
+    
+}
+function grammarMatch(grammar: GrammarDeclare, doc: TextDocument)
+{
+    const code = doc.getText();
+    for (let i = 0; i < code.length; i++)
+    {
+        
+    }
+}
+
+export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern };
