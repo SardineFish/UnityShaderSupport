@@ -382,6 +382,12 @@ class PatternScope extends NestedPattern
     }
     match(doc: TextDocument, startOffset: number): GrammarMatch
     {
+        function cleanSpace()
+        {
+            let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
+            if (skip)
+                startOffset += skip[0].length;
+        }
         let match = new GrammarMatch(doc, this);
         match.startOffset = startOffset;
         try 
@@ -396,13 +402,8 @@ class PatternScope extends NestedPattern
                 return match;
             }
             else
-            {
-                // Clearn space
-                let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
-                if (skip)
-                    startOffset += skip[0].length;
+                cleanSpace();
             
-            }
             let hasMatched = false;
             for (let i = 1; i < this.subPatterns.length; i++)
             {
@@ -420,19 +421,21 @@ class PatternScope extends NestedPattern
                     if (i === this.subPatterns.length - 1)
                         break;
 
-                    // Clearn space
-                    let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
-                    if (skip)
-                        startOffset += skip[0].length;
+                    cleanSpace();
                 }
 
                 // Skip a line and continue matching
                 if (!hasMatched)
                 {
+                    let unMatched = new UnMatchedText(doc, this.scope);
+                    unMatched.startOffset = startOffset;
+                    match.children.push(unMatched);
+
                     let pos = doc.positionAt(startOffset);
                     pos.line++;
                     pos.character = 0;
                     startOffset = doc.offsetAt(pos);
+                    unMatched.endOffset = startOffset - 1;
                     // Chceck if reach end
                     let pos2 = doc.positionAt(startOffset);
                     if (pos2.line !== pos.line)
@@ -440,6 +443,7 @@ class PatternScope extends NestedPattern
                         match.matched = false;
                         return match;
                     }
+                    cleanSpace();
                 }
                 i = 0;
                 hasMatched = false;
@@ -491,6 +495,10 @@ class GrammarMatch
     {
         this.document = doc;
         this.patternItem = patternItem;
+    }
+    toString(): string
+    {
+        return this.text;
     }
 }
 class UnMatchedText extends GrammarMatch
