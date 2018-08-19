@@ -192,15 +192,8 @@ abstract class PatternItem
     ignorable: boolean = false;
     multi: boolean = false;
     pattern: GrammarPattern;
-    abstract isMatch(char: string, index: number, text: string): boolean;
-    moveNext(): PatternItem
-    {
-        if (this.parent)
-            return this.parent.moveNext();
-        return null;
-    }
-    abstract reset(): void;
-    constructor(pattern: GrammarPattern, ignorable=false)
+    abstract match(doc: TextDocument, startOffset: number): GrammarMatch;
+    constructor(pattern: GrammarPattern, ignorable = false)
     {
         this.pattern = pattern;
         this.ignorable = ignorable;
@@ -211,189 +204,253 @@ abstract class PatternItem
     }
 }
 
-class TextPattern extends PatternItem
-{
-    text: string;
-    currentIdx: number = 0;
-    isMatch(char: string)
-    {
-        return char === this.text[this.currentIdx];
-    }
-    moveNext(): PatternItem
-    {
-        if (++this.currentIdx < this.text.length)
-            return this;
-        return super.moveNext();
-    }
-    reset()
-    {
-        this.currentIdx = 0;
-    }
-    constructor(pattern: GrammarPattern, text: string, ignorable=false)
-    {
-        super(pattern, ignorable);
-        this.text = text;
-        this.name = text;
-    }
-}
 class EmptyPattern extends PatternItem
 {
     name = "space";
-    isMatch(char: string)
-    {
-        /*
-        if (char === " " || char === "\r" || char === "\n")
-            return 1;
-        if (this.ignorable)
-            return MatchResult.Skip;
-        return 0;
-        */
-        return char === " " || char === "\r" || char === "\n";
-    }
-    reset() { }
     constructor(pattern: GrammarPattern, ignorable: boolean = false)
     {
         super(pattern, ignorable);
     }
+    static skipEmpty(doc: TextDocument, startOffset: number, crossLine = false): RegExpExecArray
+    {
+        const reg = crossLine ?
+            /((?:\s|\/\*(?!\/).*?\*\/)*)(\/\/.*[\r]?[\n]?)?/
+            :
+            /((?:[ \t]|\/\*(?!\/).*?\*\/)*)?/;
+        const text = doc.getText().substr(startOffset);
+        let match = reg.exec(text);
+        if (match.index > 0)
+            return null;
+        return match;
+    }
+    match(doc: TextDocument, startOffset: number): GrammarMatch
+    {
+        let empty = EmptyPattern.skipEmpty(doc, startOffset, this.pattern.crossLine);
+        let match = new GrammarMatch(doc, this);
+        match.startOffset = startOffset;
+        if (empty && empty[0].length > 0)
+        {
+            match.endOffset = startOffset + empty[0].length;
+            match.matched = true;
+        }
+        else
+        {
+            match.endOffset = startOffset;
+            match.matched = false;
+        }
+        return match;
+    }
 }
+class RegExpPattern extends PatternItem
+{
+    name = "regExp";
+    regExp: RegExp;
+    constructor(pattern: GrammarPattern, reg: RegExp, ignorable: boolean = false)
+    {
+        super(pattern, ignorable);
+        this.regExp = reg;
+    }
+    match(doc: TextDocument, startOffset: number): GrammarMatch
+    {
+        let skip = EmptyPattern.skipEmpty(doc, startOffset, this.pattern.crossLine);
+        if (skip)
+            startOffset += skip[0].length;
+        let text = doc.getText().substr(startOffset);
+        let regMatch = this.regExp.exec(text);
+        let match = new GrammarMatch(doc, this);
+        match.startOffset = startOffset;
+        if (!regMatch || regMatch.index !== 0)
+        {
+            match.endOffset = startOffset;
+            match.matched = false;
+        }
+        else
+        {
+            match.endOffset = startOffset + regMatch[0].length;
+            match.matched = true;
+        }
+        return match;
+    }
+}
+class TextPattern extends RegExpPattern
+{
+    text: string;
+    currentIdx: number = 0;
+    get ignoreCase() { return this.regExp.ignoreCase; }
+    constructor(pattern: GrammarPattern, text: string, ignorable = false, ignoreCase = false)
+    {
+        super(pattern, new RegExp(text.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&'), ignoreCase ? "i" : ""), ignorable);
+        this.text = text;
+        this.name = text;
+    }
+}
+class StringPattern extends RegExpPattern
+{
+    name = "string";
+    begin: boolean = false;
+    slash: boolean = false;
+    end: boolean = false;
+    constructor(pattern: GrammarPattern, ignorable = false)
+    {
+        super(pattern, /"([^\\"]|\\\S|\\")*"/, ignorable);
+    }
+    toString = () => this.ignorable ? "[string]" : "<string>";
+}
+class NumberPattern extends RegExpPattern
+{
+    name = "number";
+    constructor(pattern: GrammarPattern, ignorable = false)
+    {
+        super(pattern, /[+-]?[0-9]+\.?[0-9]*/, ignorable);
+    }
+}
+class IdentifierPattern extends RegExpPattern
+{
+    name = "identifier";
+    constructor(pattern: GrammarPattern, ignorable = false)
+    {
+        super(pattern, /[_a-zA-Z][_a-zA-Z0-9]*/, ignorable);
+    }
+}
+
 class NestedPattern extends PatternItem
 {
     name = "nest";
     subPatterns: PatternItem[] = [];
     currentIdx: number = 0;
     get count() { return this.subPatterns.length; }
-    isMatch(char: string, index: number, text: string)
-    {
-        return this.subPatterns[this.currentIdx].isMatch(char, index, text);
-    }
-    getChildren(idx: number = 0): PatternItem
-    {
-        if (this.subPatterns[idx])
-        {
-            if (this.subPatterns[idx] instanceof NestedPattern)
-                return (<NestedPattern>this.subPatterns[idx]).getChildren(0);
-            else
-                return this.subPatterns[idx];
-        }
-        return null;
-    }
-    moveNext(): PatternItem
-    {
-        if (++this.currentIdx < this.subPatterns.length)
-            return this.getChildren(this.currentIdx);
-        else if (this.parent)
-            return this.parent.moveNext();
-        return null;
-    }
-    reset()
-    {
-        this.subPatterns.forEach(pattern => pattern.reset());
-        this.currentIdx = 0;
-    }
     addSubPattern(patternItem: PatternItem)
     {
         this.subPatterns.push(patternItem);
     }
     toString()
     {
-        let str = super.toString() + "\r\n"+ this.subPatterns.map(pattern => pattern.toString()).join("\r\n").split(/\r\n/g).map(str => "\t" + str).join("\r\n");
+        let str = super.toString() + "\r\n" + this.subPatterns.map(pattern => pattern.toString()).join("\r\n").split(/\r\n/g).map(str => "\t" + str).join("\r\n");
         return str;
     }
-
-}
-class StringPattern extends PatternItem
-{
-    name = "string";
-    begin: boolean = false;
-    slash: boolean = false;
-    end: boolean = false;
-    isMatch(char: string)
+    match(doc: TextDocument, startOffset: number): GrammarMatch
     {
-        if (this.end)
-            return false;
-        if (char === "\\")
+        let match = new GrammarMatch(doc, this);
+        match.startOffset = startOffset;
+        try 
         {
-            this.slash = true;
-            return this.begin;
-        }
-        if (this.slash)
-        {
-            this.slash = false;
-            return this.begin;
-        }
-        if (this.begin)
-        {
-            if (char === "\"")
+            for (let i = 0; i < this.subPatterns.length; i++)
             {
-                this.end = true;
-                return true;
+                let subMatch = this.subPatterns[i].match(doc, startOffset);
+                if (!subMatch.matched)
+                {
+                    if (this.subPatterns[i].ignorable)
+                        continue;
+                    match.children.push(subMatch);
+                    match.endOffset = subMatch.endOffset;
+                    match.matched = false;
+                    return match;
+                }
+                match.children.push(subMatch);
+                startOffset = subMatch.endOffset;
+                if (this.subPatterns[i].multi)
+                    i--;
             }
-            return true;
+            if (match.children.length === 0)
+            {
+                match.endOffset = match.startOffset + 1;
+                match.matched = false;
+            }
+            else
+            {
+                match.endOffset = match.children[match.children.length - 1].endOffset;
+                match.startOffset = match.children[0].startOffset;
+                match.matched = true;
+            }
         }
-        else if (char === "\"")
+        catch (ex)
         {
-            this.begin = true;
+            console.error(ex);
         }
-        else
-            return false;
+        return match;
     }
-    reset(): void
-    {
-        this.begin = false;
-        this.slash = false;
-        this.end = false;
-    }
-    toString = () => this.ignorable ? "[string]" : "<string>";
-}
-class NumberPattern extends PatternItem
-{
-    name = "number";
-    isMatch(char: string, index: number, text: string)
-    {
-        if (text.substr(index).search(/[+-]?[0-9]?(\.[0-9]+)?/) === 0)
-        {
-            return true;
-        }
-        return false;
-    }
-    reset(): void
-    {
-        throw new Error("Method not implemented.");
-    }
-
-
-}
-class IdentifierPattern extends PatternItem
-{
-    name = "identifier";
-    isMatch(char: string): boolean
-    {
-        throw new Error("Method not implemented.");
-    }
-    reset(): void
-    {
-        throw new Error("Method not implemented.");
-    }
-
-
 }
 class PatternScope extends NestedPattern
 {
     name = "scope";
     scope: GrammarScope;
-    isMatch(char: string, index: number, text: string): boolean
-    {
-        throw new Error("Method not implemented.");
-    }
-    reset(): void
-    {
-        throw new Error("Method not implemented.");
-    }
 
     constructor(pattern: GrammarPattern, scope: GrammarScope)
     {
         super(pattern, false);
         this.scope = scope;
+    }
+    match(doc: TextDocument, startOffset: number): GrammarMatch
+    {
+        let match = new GrammarMatch(doc, this);
+        match.startOffset = startOffset;
+        try 
+        {
+            let hasMatched = false;
+            for (let i = 0; i < this.subPatterns.length; i++)
+            {
+                let subMatch = this.subPatterns[i].match(doc, startOffset);
+                if (!subMatch.matched)
+                {
+                    if (this.subPatterns[i].ignorable)
+                        continue;
+                    if (i === 0)
+                    {
+                        match.children.push(subMatch);
+                        match.endOffset = subMatch.endOffset;
+                        match.matched = false;
+                        return match;
+                    }
+                }
+                else
+                {
+                    match.children.push(subMatch);
+                    match.endOffset = startOffset = subMatch.endOffset;
+                    hasMatched = true;
+                    // Clearn space
+                    let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
+                    if (skip)
+                        startOffset += skip[0].length;
+                    if (i === this.subPatterns.length - 1)
+                        break;
+                }
+
+                // Skip a line and continue matching
+                if (!hasMatched)
+                {
+                    let pos = doc.positionAt(startOffset);
+                    pos.line++;
+                    pos.character = 0;
+                    startOffset = doc.offsetAt(pos);
+                    // Chceck if reach end
+                    let pos2 = doc.positionAt(startOffset);
+                    if (pos2.line !== pos.line)
+                    {
+                        match.matched = false;
+                        return match;
+                    }
+                }
+                i = 0;
+                hasMatched = false;
+            }
+                
+            if (match.children.length === 0)
+            {
+                match.endOffset = match.startOffset + 1;
+                match.matched = false;
+            }
+            else
+            {
+                match.endOffset = match.children[match.children.length - 1].endOffset;
+                match.startOffset = match.children[0].startOffset;
+                match.matched = true;
+            }
+        }
+        catch (ex)
+        {
+            console.error(ex);
+        }
+        return match;
     }
 }
 class Grammar extends NestedPattern
@@ -403,6 +460,26 @@ class Grammar extends NestedPattern
     constructor(grammar: GrammarDeclare)
     {
         super(null, false);
+    }
+}
+class GrammarMatch
+{
+    document: TextDocument;
+    patternItem: PatternItem;
+    patternName: string;
+    scope: GrammarScope;
+    startOffset: number;
+    endOffset: number;
+    matched: boolean = true;
+    children: GrammarMatch[] = [];
+    get start() { return this.document.positionAt(this.startOffset); }
+    get end() { return this.document.positionAt(this.endOffset); }
+    get text() { return this.document.getText({ start: this.start, end: this.end }); }
+    get pattern() { return this.patternItem.pattern; }
+    constructor(doc: TextDocument, patternItem: PatternItem)
+    {
+        this.document = doc;
+        this.patternItem = patternItem;
     }
 }
 class PatternDictionary
@@ -425,11 +502,14 @@ class GrammarScope
 }
 class GrammarPattern
 {
-    static String: GrammarPattern = { patterns: ["\"[string]\""], name: "String" };
+    static String: GrammarPattern = { patterns: ["<string>"], name: "String" };
+    static Number: GrammarPattern = { patterns: ['<number>'], name: "Number" };
+    static Identifier: GrammarPattern = { patterns: ['<identifier>'], name: "Identifier" };
     patterns: string[];
     caseInsensitive?: boolean = false;
     dictionary?: PatternDictionary;
     name?: string;
+    crossLine?: boolean = false;
     scopes?: PatternScopeDictionary;
     _compiledPattern?: NestedPattern[];
 }
@@ -484,22 +564,23 @@ function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
             throw new Error("Pattern undefined.");
         return compileScope(scope, pattern);
     }
+    else if (item.startsWith("/") && item.endsWith("/"))
+    {
+        let reg = item.substr(1, item.length - 2);
+        let subPattern = new RegExpPattern(pattern, new RegExp(reg, pattern.caseInsensitive ? "i" : ""), false);
+        subPattern.name = reg;
+        return subPattern;
+    }
     throw new Error("Syntax Error.");
 }
 function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
 {
-    const bracketStart = ["<", "[", "{"];
-    const bracketEnd = [">", "]", "}"];
+    const bracketStart = ["<", "[", "{", "/"];
+    const bracketEnd = [">", "]", "}", "/"];
     const spaceChars = [" "];
     const isBracketStart = (chr: string): boolean => bracketStart.indexOf(chr) >= 0;
     const isBracketEnd = (chr: string): boolean => bracketEnd.indexOf(chr) >= 0;
     const isSpace = (chr: string): boolean => spaceChars.indexOf(chr) >= 0;
-    const buildInPattern: any = {
-        "string": (pt: GrammarPattern) => new StringPattern(pt),
-        "number": (pt: GrammarPattern) => new NumberPattern(pt),
-        "identifier": (pt: GrammarPattern) => new IdentifierPattern(pt),
-        " ": (pt: GrammarPattern) => new EmptyPattern(pt),
-    }
     enum State { CollectWords, MatchBracket };
 
     let patternItem: NestedPattern = new NestedPattern(pattern, false);
@@ -510,13 +591,13 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
 
     for (let i = 0; i < item.length; i++)
     {
-        if (item[i] === "\\")
-        {
-            words += item[++i];
-            continue;
-        }
         if (state === State.CollectWords)
         {
+            if (item[i] === "\\")
+            {
+                words += item[++i];
+                continue;
+            }
             if (isBracketStart(item[i]))
             {
                 if (words !== "")
@@ -543,10 +624,13 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
         }
         else if (state === State.MatchBracket)
         {
+            if (item[i] === "\\")
+            {
+                words += (item[i] + item[++i]);
+                continue;
+            }
             words += item[i];
-            if (isBracketStart(item[i]))
-                bracketDepth++;
-            else if (isBracketEnd(item[i]))
+            if (isBracketEnd(item[i]))
             {
                 bracketDepth--;
                 if (bracketDepth === 0)
@@ -557,11 +641,13 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
                     continue;
                 }
             }
+            else if (isBracketStart(item[i]))
+                bracketDepth++;
         }
     }
 
     if (state === State.CollectWords && words !== "")
-        patternItem.addSubPattern(new TextPattern(pattern, words));
+        patternItem.addSubPattern(new TextPattern(pattern, words, false, pattern.caseInsensitive));
     else if (state === State.MatchBracket && bracketDepth > 0)
         throw new Error("Syntax error.");
     
@@ -598,7 +684,13 @@ function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
 {
     let patternList = new PatternScope(pattern, scope);
     patternList.addSubPattern(new TextPattern(pattern, scope.begin, false));
-    scope.patterns.forEach(pattern => patternList.addSubPattern(compilePattern(pattern)));
+    scope.patterns.forEach(pattern =>
+    {
+        let subPattern = compilePattern(pattern);
+        subPattern.ignorable = true;
+        subPattern.multi = true;
+        patternList.addSubPattern(subPattern);
+    });
     patternList.addSubPattern(new TextPattern(pattern, scope.end, false));
     patternList.name = scope.name ? scope.name : "Scope";
     return patternList;
@@ -610,4 +702,11 @@ function compileGrammar(grammarDeclare: GrammarDeclare):Grammar
     return grammar;
 }
 
-export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern, compileGrammar };
+function matchGrammar(grammar: Grammar, doc: TextDocument): GrammarMatch
+{
+    let root = new GrammarMatch(doc, grammar);
+    root.startOffset = 0;
+    root.endOffset = doc.getText().length;
+    return grammar.match(doc, 0);
+}
+export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern, compileGrammar, matchGrammar };

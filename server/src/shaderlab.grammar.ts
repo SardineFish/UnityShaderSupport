@@ -96,6 +96,13 @@ const sourceShaderLab: ScopeDeclare = {
 const propertyType: GrammarPattern = {
     name: "Property Type",
     patterns: ["<typeName>[(<number>[, <number> ...])]"],
+    dictionary: {
+        "typeName": {
+            patterns: [
+                "/[_a-zA-Z0-9]+/"
+            ]
+        }
+    }
 };
 const propertyValue: GrammarPattern = {
     name: "Property Value",
@@ -110,6 +117,7 @@ const propertiesPattern: GrammarPattern =
     name: "Properties",
     patterns: ["Properties {propScope}"],
     caseInsensitive: true,
+    crossLine: true,
     scopes: {
         "propScope": {
             begin: "{",
@@ -131,6 +139,7 @@ const propertiesPattern: GrammarPattern =
 const tagsPattern: GrammarPattern = {
     name: "Tags",
     patterns: ["Tags {tagScope}"],
+    crossLine: true,
     caseInsensitive: true,
     scopes: {
         "tagScope": {
@@ -152,16 +161,19 @@ const renderSetupPattern: GrammarPattern = {
     name: "Render Setup",
     patterns: ["<property> < > <value>"],
     dictionary: {
-        "property": GrammarPattern.String,
-        "value": GrammarPattern.String
+        "property": GrammarPattern.Identifier,
+        "value": {
+            name:"Render Setup Value",
+            patterns: ["<identifier>", "<string>", "<number>"]
+        }
     }
 };
 const cgProgram: GrammarPattern = {
     name: "Cg Program",
-    patterns: ["CGPROGRAM {cgProgram}"],
+    patterns: ["{cgProgram}"],
     scopes: {
         "cgProgram": {
-            begin: " ",
+            begin: "CGPROGRAM",
             end: "ENDCG",
             patterns: [
                 
@@ -173,6 +185,7 @@ const pass: GrammarPattern = {
     name: "Pass",
     patterns: ["Pass {pass}"],
     caseInsensitive: true,
+    crossLine: true,
     scopes: {
         "pass": {
             begin: "{",
@@ -189,6 +202,7 @@ const subShaderPattern: GrammarPattern = {
     name: "SubShader",
     patterns: ["SubShader {subShaderScope}"],
     caseInsensitive: true,
+    crossLine: true,
     scopes: {
         "subShaderScope": {
             begin: "{",
@@ -221,8 +235,9 @@ const grammarShaderLab: GrammarDeclare = {
     },
     patterns: [
         {
-            patterns: ["Shader <shaderName> {shaderScope}"],
+            patterns: ["Shader <string> {shaderScope}"],
             caseInsensitive: true,
+            crossLine: true,
             scopes: {
                 "shaderScope": {
                     name: "Shader",

@@ -39,7 +39,7 @@ Shader <name>
 <grammar>
 	[nest]
 		<Shader>
-		<identifier>
+		<string>
 		<Shader>
 			<{>
 			[nest]
@@ -52,7 +52,7 @@ Shader <name>
 						<string>
 						<,>
 						<nest>
-							<identifier>
+							<[_a-zA-Z0-9]+>
 							[nest]
 								<(>
 								<number>
@@ -94,9 +94,12 @@ Shader <name>
 								<string>
 							<}>
 					[nest]
-						<string>
+						<identifier>
 						<space>
-						<string>
+						<nest>
+							[identifier]
+							[string]
+							[number]
 					[nest]
 						<Pass>
 						<Scope>
@@ -111,19 +114,18 @@ Shader <name>
 										<string>
 									<}>
 							[nest]
-								<string>
+								<identifier>
 								<space>
-								<string>
-							[nest]
+								<nest>
+									[identifier]
+									[string]
+									[number]
+							[Scope]
 								<CGPROGRAM>
-								<Scope>
-									< >
-									<ENDCG>
+								<ENDCG>
 							<}>
-					[nest]
+					[Scope]
 						<CGPROGRAM>
-						<Scope>
-							< >
-							<ENDCG>
+						<ENDCG>
 					<}>
 			<}>
