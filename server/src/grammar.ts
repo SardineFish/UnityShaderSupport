@@ -16,7 +16,7 @@ class Scope
     endOffset: number = 0;
     scopes: Scope[] = [];
     scopeDeclare: ScopeDeclare;
-    constructor(doc: TextDocument, declare:ScopeDeclare)
+    constructor(doc: TextDocument, declare: ScopeDeclare)
     {
         this.scopeDeclare = declare;
         this.document = doc;
@@ -162,7 +162,7 @@ function diagnostic(pattern: PatternDeclare, doc: TextDocument, startOffset: num
             {
                 if (!pattern.captures[i])
                     continue;
-                
+
                 // Handle unmatch diagnostic
                 if (match[i] === undefined && pattern.captures[i].unmatched)
                 {
@@ -197,9 +197,10 @@ abstract class PatternItem
         return null;
     }
     abstract reset(): void;
-    constructor(pattern: GrammarPattern)
+    constructor(pattern: GrammarPattern, ignorable=false)
     {
         this.pattern = pattern;
+        this.ignorable = ignorable;
     }
 }
 
@@ -221,6 +222,11 @@ class TextPattern extends PatternItem
     {
         this.currentIdx = 0;
     }
+    constructor(pattern: GrammarPattern, text: string, ignorable=false)
+    {
+        super(pattern, ignorable);
+        this.text = text;
+    }
 }
 class CharSetPattern extends PatternItem
 {
@@ -231,7 +237,7 @@ class CharSetPattern extends PatternItem
     {
         return this.charSet.indexOf(char) >= 0;
     }
-    moveNext():PatternItem
+    moveNext(): PatternItem
     {
         if (--this.count > 0)
             return this;
@@ -256,12 +262,16 @@ class EmptyPattern extends PatternItem
         return char === " " || char === "\r" || char === "\n";
     }
     reset() { }
+    constructor(pattern: GrammarPattern, ignorable: boolean = false)
+    {
+        super(pattern, ignorable);
+    }
 }
 class NestedPattern extends PatternItem
 {
     subPatterns: PatternItem[] = [];
     currentIdx: number = 0;
-
+    get count() { return this.subPatterns.length; }
     isMatch(char: string, index: number, text: string)
     {
         return this.subPatterns[this.currentIdx].isMatch(char, index, text);
@@ -290,8 +300,13 @@ class NestedPattern extends PatternItem
         this.subPatterns.forEach(pattern => pattern.reset());
         this.currentIdx = 0;
     }
+    addSubPattern(patternItem: PatternItem)
+    {
+        this.subPatterns.push(patternItem);
+    }
 }
-class StringPattern extends PatternItem{
+class StringPattern extends PatternItem
+{
     begin: boolean = false;
     slash: boolean = false;
     end: boolean = false;
@@ -351,7 +366,7 @@ class NumberPattern extends PatternItem
 }
 class IdentifierPattern extends PatternItem
 {
-    isMatch(char: string):boolean
+    isMatch(char: string): boolean
     {
         throw new Error("Method not implemented.");
     }
@@ -360,9 +375,9 @@ class IdentifierPattern extends PatternItem
         throw new Error("Method not implemented.");
     }
 
-    
+
 }
-class PatternScope extends PatternItem
+class PatternScope extends NestedPattern
 {
     scope: GrammarScope;
     isMatch(char: string, index: number, text: string): boolean
@@ -376,8 +391,16 @@ class PatternScope extends PatternItem
 
     constructor(pattern: GrammarPattern, scope: GrammarScope)
     {
-        super(pattern);
+        super(pattern, false);
         this.scope = scope;
+    }
+}
+class Grammar extends NestedPattern
+{
+    grammar: GrammarDeclare;
+    constructor(grammar: GrammarDeclare)
+    {
+        super(null, false);
     }
 }
 class PatternDictionary
@@ -416,21 +439,26 @@ class GrammarDeclare
     stringDelimiter?: string[];
     pairMatch?: string[][];
 }
-function analysePatternItem(item: string,pattern:GrammarPattern): PatternItem
+function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
 {
-    const bracketChars = [" ", "<", ">", "[", "]", "{", "}"];
+    const bracketStart = ["<", "(", "["];
+    const bracketEnd = [">", "]", "}"];
     const spaceChars = [" "];
-    const isBracket = (chr: string): boolean => bracketChars.indexOf(chr) >= 0;
+    const isBracketStart = (chr: string): boolean => bracketStart.indexOf(chr) >= 0;
+    const isBracketEnd = (chr: string): boolean => bracketEnd.indexOf(chr) >= 0;
     const isSpace = (chr: string): boolean => spaceChars.indexOf(chr) >= 0;
     const buildInPattern: any = {
         "string": (pt: GrammarPattern) => new StringPattern(pt),
         "number": (pt: GrammarPattern) => new NumberPattern(pt),
         "identifier": (pt: GrammarPattern) => new IdentifierPattern(pt),
+        " ": (pt: GrammarPattern) => new EmptyPattern(pt),
     }
+    enum State { CollectWords, MatchBracket };
     let bracketDepth = 0;
     let startBracket = "";
     let words = "";
-    let patternItem: PatternItem;
+    let state: State = State.CollectWords;
+    let patternItem: NestedPattern;
     if (item[0] === "<" && item[item.length - 1] === ">")
     {
         let name = item.substr(1, item.length - 2);
@@ -442,7 +470,7 @@ function analysePatternItem(item: string,pattern:GrammarPattern): PatternItem
     }
     else if (item[0] === "[" && item[item.length - 1] === "]")
     {
-        patternItem = new NestedPattern(pattern);
+        patternItem = new NestedPattern(pattern, true);
         item = item.substr(1, item.length - 2);
     }
     else if (item[0] === "{" && item[item.length - 1] === "}")
@@ -450,40 +478,105 @@ function analysePatternItem(item: string,pattern:GrammarPattern): PatternItem
         let name = item.substr(1, item.length - 2);
         let scope = pattern.scopes[name];
         if (!scope)
-            throw new IdentifierPattern(pattern);
-        return new PatternScope(pattern, scope);
+            throw new Error("Pattern undefined.");
+        return compileScope(scope, pattern);
     }
+    else
+        patternItem = new NestedPattern(pattern, false);
+
+    state = State.CollectWords;
 
     for (let i = 0; i < item.length; i++)
     {
-        if (isSpace(item[i]))
+        if (state === State.CollectWords)
         {
-            if (bracketDepth === 0)
+            if (isBracketStart(item[i]))
             {
-                if (words === "")
-                    continue;
-
+                if (words !== "")
+                    patternItem.addSubPattern(new TextPattern(pattern, words));
+                words = "";
+                state = State.MatchBracket;
+                bracketDepth++;
+                continue;
+            }
+            else if (isSpace(item[i]))
+            {
+                if (words !== "")
+                    patternItem.addSubPattern(new TextPattern(pattern, words));
+                words = "";
+                continue;
+            }
+            else if (isBracketEnd(item[i]))
+                throw new Error("Syntax error.");
+            else
+            {
+                words += item[i];
+                continue;
             }
         }
+        else if (state === State.MatchBracket)
+        {
+            if (isBracketStart(item[i]))
+                bracketDepth++;
+            else if (isBracketEnd)
+            {
+                bracketDepth--;
+                if (bracketDepth === 0)
+                {
+                    patternItem.addSubPattern(analysePatternItem(words, pattern));
+                    words = "";
+                    state = State.CollectWords;
+                    continue;
+                }
+            }
+            else
+                words += item[i];
+        }
     }
+
+    if (state === State.CollectWords && words !== "")
+        patternItem.addSubPattern(new TextPattern(pattern, words));
+    else if (state === State.MatchBracket && bracketDepth > 0)
+        throw new Error("Syntax error.");
+    
+    if (patternItem.subPatterns.length === 0)
+        throw new Error("No pattern.");
+    else if (patternItem.subPatterns.length === 1)
+    {
+        patternItem.subPatterns[0].ignorable = patternItem.ignorable;
+        return patternItem.subPatterns[0];
+    }
+    return patternItem;
 }
-function compileGrammar(pattern: GrammarPattern):PatternItem
+function compileGrammar(pattern: GrammarPattern): PatternItem
 {
     if (pattern === GrammarPattern.String)
         return new StringPattern(pattern);
-    let patternList:PatternItem[] = [];
-    pattern.patterns.forEach(pt =>
+    let patternList: NestedPattern = new NestedPattern(pattern, true);
+    pattern.patterns.forEach(pt => patternList.addSubPattern(analysePatternItem(pt, pattern)));
+    if (patternList.count === 0)
+        throw new Error("No pattern.");
+    if (patternList.count === 1)
     {
-        patternList.push(analysePatternItem(pt));
-    });
-}
-function grammarMatch(grammar: GrammarDeclare, doc: TextDocument)
-{
-    const code = doc.getText();
-    for (let i = 0; i < code.length; i++)
-    {
-        
+        patternList.subPatterns[0].ignorable = true;
+        return patternList.subPatterns[0];
     }
+    return patternList;
+}
+function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
+{
+    let patternList = new PatternScope(pattern, scope);
+    patternList.addSubPattern(new TextPattern(pattern, scope.begin, false));
+    scope.patterns.forEach(pattern => patternList.addSubPattern(compileGrammar(pattern)));
+    patternList.addSubPattern(new TextPattern(pattern, scope.end, false));
+    return patternList;
+}
+function grammarMatch(grammarDeclare: GrammarDeclare, doc: TextDocument):Grammar
+{
+    let grammar = new Grammar(grammarDeclare);
+    const code = doc.getText();
+    grammarDeclare.patterns.forEach(pattern => grammar.addSubPattern(compileGrammar(pattern)));
+    return grammar;
 }
 
 export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern };
