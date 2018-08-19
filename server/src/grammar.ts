@@ -386,33 +386,44 @@ class PatternScope extends NestedPattern
         match.startOffset = startOffset;
         try 
         {
+            // Match first pattern
+            let subMatch = this.subPatterns[0].match(doc, startOffset);
+            match.children.push(subMatch);
+            match.endOffset = startOffset = subMatch.endOffset;
+            if (!subMatch.matched)
+            {
+                match.matched = false;
+                return match;
+            }
+            else
+            {
+                // Clearn space
+                let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
+                if (skip)
+                    startOffset += skip[0].length;
+            
+            }
             let hasMatched = false;
-            for (let i = 0; i < this.subPatterns.length; i++)
+            for (let i = 1; i < this.subPatterns.length; i++)
             {
                 let subMatch = this.subPatterns[i].match(doc, startOffset);
                 if (!subMatch.matched)
                 {
-                    if (this.subPatterns[i].ignorable)
+                    if (i < this.subPatterns.length - 1)
                         continue;
-                    if (i === 0)
-                    {
-                        match.children.push(subMatch);
-                        match.endOffset = subMatch.endOffset;
-                        match.matched = false;
-                        return match;
-                    }
                 }
                 else
                 {
                     match.children.push(subMatch);
                     match.endOffset = startOffset = subMatch.endOffset;
                     hasMatched = true;
+                    if (i === this.subPatterns.length - 1)
+                        break;
+
                     // Clearn space
                     let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
                     if (skip)
                         startOffset += skip[0].length;
-                    if (i === this.subPatterns.length - 1)
-                        break;
                 }
 
                 // Skip a line and continue matching
@@ -480,6 +491,15 @@ class GrammarMatch
     {
         this.document = doc;
         this.patternItem = patternItem;
+    }
+}
+class UnMatchedText extends GrammarMatch
+{
+    matched = false;
+    constructor(doc: TextDocument, scope: GrammarScope)
+    {
+        super(doc, null);
+        this.scope = scope;
     }
 }
 class PatternDictionary
