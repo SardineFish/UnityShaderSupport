@@ -34,3 +34,96 @@ Shader <name>
 		        		<number>
 		        		<)>
 				
+
+
+<grammar>
+	[nest]
+		<Shader>
+		<identifier>
+		<Shader>
+			<{>
+			[nest]
+				<Properties>
+				<Scope>
+					<{>
+					[nest]
+						<identifier>
+						<(>
+						<string>
+						<,>
+						<nest>
+							<identifier>
+							[nest]
+								<(>
+								<number>
+								[nest]
+									<,>
+									<number>
+								<)>
+						<)>
+						<=>
+						<nest>
+							[number]
+							[nest]
+								<string>
+								<{>
+								[identifier]
+								<}>
+							[nest]
+								<(>
+								<number>
+								<,>
+								<number>
+								<,>
+								<number>
+								<,>
+								<number>
+								<)>
+					<}>
+			[nest]
+				<SubShader>
+				<Scope>
+					<{>
+					[nest]
+						<Tags>
+						<Scope>
+							<{>
+							[nest]
+								<string>
+								<=>
+								<string>
+							<}>
+					[nest]
+						<string>
+						<space>
+						<string>
+					[nest]
+						<Pass>
+						<Scope>
+							<{>
+							[nest]
+								<Tags>
+								<Scope>
+									<{>
+									[nest]
+										<string>
+										<=>
+										<string>
+									<}>
+							[nest]
+								<string>
+								<space>
+								<string>
+							[nest]
+								<CGPROGRAM>
+								<Scope>
+									< >
+									<ENDCG>
+							<}>
+					[nest]
+						<CGPROGRAM>
+						<Scope>
+							< >
+							<ENDCG>
+					<}>
+			<}>

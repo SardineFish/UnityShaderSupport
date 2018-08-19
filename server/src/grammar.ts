@@ -1,9 +1,10 @@
 import { TextDocument, Position, TextDocumentItem, LogMessageNotification, CompletionItem, Diagnostic, Range } from "vscode-languageserver";
 import linq from "linq";
-import sourceShaderLab from "./shaderlab.grammar";
+//import sourceShaderLab from "./shaderlab.grammar";
 
 type DocumentCompletionCallback = () => CompletionItem[];
 type DocumentDiagnoseCallback = (text: string, range: Range) => Diagnostic[];
+type PatternItemDictionary = { [key: string]: (pattern: GrammarPattern) => PatternItem };
 
 class Code
 {
@@ -30,7 +31,7 @@ class ShaderCode implements Code
     scopes: Scope;
     constructor(doc: TextDocument)
     {
-        this.scopes = scopeMatch(sourceShaderLab, doc, 0);
+        //this.scopes = scopeMatch(sourceShaderLab, doc, 0);
     }
 }
 class ScopeDeclare
@@ -186,8 +187,10 @@ enum MatchResult
 }
 abstract class PatternItem
 {
+    name: string = "pattern";
     parent?: NestedPattern;
-    ignorable?: boolean = false;
+    ignorable: boolean = false;
+    multi: boolean = false;
     pattern: GrammarPattern;
     abstract isMatch(char: string, index: number, text: string): boolean;
     moveNext(): PatternItem
@@ -201,6 +204,10 @@ abstract class PatternItem
     {
         this.pattern = pattern;
         this.ignorable = ignorable;
+    }
+    toString():string
+    {
+        return this.ignorable ? `[${this.name}]` : `<${this.name}>`;
     }
 }
 
@@ -226,30 +233,12 @@ class TextPattern extends PatternItem
     {
         super(pattern, ignorable);
         this.text = text;
-    }
-}
-class CharSetPattern extends PatternItem
-{
-    charSet: string[];
-    count: number = 1;
-    private _originalCount = 1;
-    isMatch(char: string)
-    {
-        return this.charSet.indexOf(char) >= 0;
-    }
-    moveNext(): PatternItem
-    {
-        if (--this.count > 0)
-            return this;
-        return super.moveNext();
-    }
-    reset()
-    {
-        this.count = this._originalCount;
+        this.name = text;
     }
 }
 class EmptyPattern extends PatternItem
 {
+    name = "space";
     isMatch(char: string)
     {
         /*
@@ -269,6 +258,7 @@ class EmptyPattern extends PatternItem
 }
 class NestedPattern extends PatternItem
 {
+    name = "nest";
     subPatterns: PatternItem[] = [];
     currentIdx: number = 0;
     get count() { return this.subPatterns.length; }
@@ -304,9 +294,16 @@ class NestedPattern extends PatternItem
     {
         this.subPatterns.push(patternItem);
     }
+    toString()
+    {
+        let str = super.toString() + "\r\n"+ this.subPatterns.map(pattern => pattern.toString()).join("\r\n").split(/\r\n/g).map(str => "\t" + str).join("\r\n");
+        return str;
+    }
+
 }
 class StringPattern extends PatternItem
 {
+    name = "string";
     begin: boolean = false;
     slash: boolean = false;
     end: boolean = false;
@@ -346,9 +343,11 @@ class StringPattern extends PatternItem
         this.slash = false;
         this.end = false;
     }
+    toString = () => this.ignorable ? "[string]" : "<string>";
 }
 class NumberPattern extends PatternItem
 {
+    name = "number";
     isMatch(char: string, index: number, text: string)
     {
         if (text.substr(index).search(/[+-]?[0-9]?(\.[0-9]+)?/) === 0)
@@ -366,6 +365,7 @@ class NumberPattern extends PatternItem
 }
 class IdentifierPattern extends PatternItem
 {
+    name = "identifier";
     isMatch(char: string): boolean
     {
         throw new Error("Method not implemented.");
@@ -379,6 +379,7 @@ class IdentifierPattern extends PatternItem
 }
 class PatternScope extends NestedPattern
 {
+    name = "scope";
     scope: GrammarScope;
     isMatch(char: string, index: number, text: string): boolean
     {
@@ -397,6 +398,7 @@ class PatternScope extends NestedPattern
 }
 class Grammar extends NestedPattern
 {
+    name = "grammar";
     grammar: GrammarDeclare;
     constructor(grammar: GrammarDeclare)
     {
@@ -439,9 +441,54 @@ class GrammarDeclare
     stringDelimiter?: string[];
     pairMatch?: string[][];
 }
+function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
+{
+    const buildInPattern: PatternItemDictionary = {
+        "string": (pt: GrammarPattern) => new StringPattern(pt),
+        "number": (pt: GrammarPattern) => new NumberPattern(pt),
+        "identifier": (pt: GrammarPattern) => new IdentifierPattern(pt),
+        " ": (pt: GrammarPattern) => new EmptyPattern(pt),
+    }
+    if (item[0] === "<" && item[item.length - 1] === ">")
+    {
+        let subPattern: PatternItem;
+        let name = item.substr(1, item.length - 2);
+        if (buildInPattern[name])
+            subPattern = buildInPattern[name](pattern);
+        else if (pattern.dictionary && pattern.dictionary[name])
+            subPattern = compilePattern(pattern.dictionary[name]);
+        else
+            subPattern = new IdentifierPattern(pattern);
+        subPattern.ignorable = false;
+        return subPattern;
+    }
+    else if (item[0] === "[" && item[item.length - 1] === "]")
+    {
+        item = item.substr(1, item.length - 2);
+        let multi = false;
+        if (item.endsWith("..."))
+        {
+            multi = true;
+            item = item.substr(0, item.length - 3);
+        }
+        let subPattern = analysePatternItem(item, pattern);
+        subPattern.ignorable = true;
+        subPattern.multi = multi;
+        return subPattern;
+    }
+    else if (item[0] === "{" && item[item.length - 1] === "}")
+    {
+        let name = item.substr(1, item.length - 2);
+        let scope = pattern.scopes ? pattern.scopes[name] : null;
+        if (!scope)
+            throw new Error("Pattern undefined.");
+        return compileScope(scope, pattern);
+    }
+    throw new Error("Syntax Error.");
+}
 function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
 {
-    const bracketStart = ["<", "(", "["];
+    const bracketStart = ["<", "[", "{"];
     const bracketEnd = [">", "]", "}"];
     const spaceChars = [" "];
     const isBracketStart = (chr: string): boolean => bracketStart.indexOf(chr) >= 0;
@@ -454,47 +501,27 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
         " ": (pt: GrammarPattern) => new EmptyPattern(pt),
     }
     enum State { CollectWords, MatchBracket };
+
+    let patternItem: NestedPattern = new NestedPattern(pattern, false);
+    let state:State = State.CollectWords;
     let bracketDepth = 0;
     let startBracket = "";
     let words = "";
-    let state: State = State.CollectWords;
-    let patternItem: NestedPattern;
-    if (item[0] === "<" && item[item.length - 1] === ">")
-    {
-        let name = item.substr(1, item.length - 2);
-        if (buildInPattern[name])
-            return buildInPattern;
-        if (pattern.dictionary[name])
-            return compileGrammar(pattern.dictionary[name]);
-        return new IdentifierPattern(pattern);
-    }
-    else if (item[0] === "[" && item[item.length - 1] === "]")
-    {
-        patternItem = new NestedPattern(pattern, true);
-        item = item.substr(1, item.length - 2);
-    }
-    else if (item[0] === "{" && item[item.length - 1] === "}")
-    {
-        let name = item.substr(1, item.length - 2);
-        let scope = pattern.scopes[name];
-        if (!scope)
-            throw new Error("Pattern undefined.");
-        return compileScope(scope, pattern);
-    }
-    else
-        patternItem = new NestedPattern(pattern, false);
-
-    state = State.CollectWords;
 
     for (let i = 0; i < item.length; i++)
     {
+        if (item[i] === "\\")
+        {
+            words += item[++i];
+            continue;
+        }
         if (state === State.CollectWords)
         {
             if (isBracketStart(item[i]))
             {
                 if (words !== "")
                     patternItem.addSubPattern(new TextPattern(pattern, words));
-                words = "";
+                words = item[i];
                 state = State.MatchBracket;
                 bracketDepth++;
                 continue;
@@ -516,21 +543,20 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
         }
         else if (state === State.MatchBracket)
         {
+            words += item[i];
             if (isBracketStart(item[i]))
                 bracketDepth++;
-            else if (isBracketEnd)
+            else if (isBracketEnd(item[i]))
             {
                 bracketDepth--;
                 if (bracketDepth === 0)
                 {
-                    patternItem.addSubPattern(analysePatternItem(words, pattern));
+                    patternItem.addSubPattern(analyseBracketItem(words, pattern));
                     words = "";
                     state = State.CollectWords;
                     continue;
                 }
             }
-            else
-                words += item[i];
         }
     }
 
@@ -548,12 +574,17 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
     }
     return patternItem;
 }
-function compileGrammar(pattern: GrammarPattern): PatternItem
+function compilePattern(pattern: GrammarPattern): PatternItem
 {
     if (pattern === GrammarPattern.String)
         return new StringPattern(pattern);
     let patternList: NestedPattern = new NestedPattern(pattern, true);
-    pattern.patterns.forEach(pt => patternList.addSubPattern(analysePatternItem(pt, pattern)));
+    pattern.patterns.forEach(pt =>
+    {
+        let subPattern = analysePatternItem(pt, pattern);
+        subPattern.ignorable = true;
+        patternList.addSubPattern(subPattern);
+    });
     if (patternList.count === 0)
         throw new Error("No pattern.");
     if (patternList.count === 1)
@@ -567,16 +598,16 @@ function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
 {
     let patternList = new PatternScope(pattern, scope);
     patternList.addSubPattern(new TextPattern(pattern, scope.begin, false));
-    scope.patterns.forEach(pattern => patternList.addSubPattern(compileGrammar(pattern)));
+    scope.patterns.forEach(pattern => patternList.addSubPattern(compilePattern(pattern)));
     patternList.addSubPattern(new TextPattern(pattern, scope.end, false));
+    patternList.name = scope.name ? scope.name : "Scope";
     return patternList;
 }
-function grammarMatch(grammarDeclare: GrammarDeclare, doc: TextDocument):Grammar
+function compileGrammar(grammarDeclare: GrammarDeclare):Grammar
 {
     let grammar = new Grammar(grammarDeclare);
-    const code = doc.getText();
-    grammarDeclare.patterns.forEach(pattern => grammar.addSubPattern(compileGrammar(pattern)));
+    grammarDeclare.patterns.forEach(pattern => grammar.addSubPattern(compilePattern(pattern)));
     return grammar;
 }
 
-export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern };
+export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern, compileGrammar };

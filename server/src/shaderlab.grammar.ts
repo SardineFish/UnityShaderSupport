@@ -1,6 +1,5 @@
-import { ScopeDeclare, GrammarDeclare, GrammarPattern } from "./grammar";
 import { DiagnosticSeverity, Diagnostic } from "vscode-languageserver";
-
+import { ScopeDeclare, GrammarDeclare, GrammarPattern } from "./grammar";
 /*class SourceShaderLab extends Scope
 {
     scopes: Scope[] = [];
@@ -239,4 +238,4 @@ const grammarShaderLab: GrammarDeclare = {
     ],
 };
 
-export default sourceShaderLab;
+export default grammarShaderLab;
