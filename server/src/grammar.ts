@@ -2,7 +2,8 @@ import { TextDocument, Position, TextDocumentItem, LogMessageNotification, Compl
 import linq from "linq";
 //import sourceShaderLab from "./shaderlab.grammar";
 
-type DocumentCompletionCallback = () => CompletionItem[];
+type DocumentCompletionCallback = (pos:Position) => CompletionItem[];
+type PatternMatchedCallback = (patternMatch: PatternMatchResult) => void;
 type DocumentDiagnoseCallback = (text: string, range: Range) => Diagnostic[];
 type PatternItemDictionary = { [key: string]: (pattern: GrammarPattern) => PatternItem };
 
@@ -13,7 +14,7 @@ abstract class PatternItem
     ignorable: boolean = false;
     multi: boolean = false;
     pattern: GrammarPattern;
-    abstract match(doc: TextDocument, startOffset: number): PatternMatchResult;
+    abstract match(doc: TextDocument, startOffset: number): MatchResult;
     constructor(pattern: GrammarPattern, ignorable = false)
     {
         this.pattern = pattern;
@@ -24,7 +25,24 @@ abstract class PatternItem
         return this.ignorable ? `[${this.name}]` : `<${this.name}>`;
     }
 }
+class NamedPattern extends PatternItem
+{
+    patternItem: PatternItem;
+    constructor(pattern: GrammarPattern, name: string, patternItem: PatternItem)
+    {
+        super(pattern, patternItem.ignorable);
+        this.name = name;
+        this.patternItem = patternItem;
+    }
+    match(doc: TextDocument, startOffset: number): MatchResult
+    {
+        let match = this.patternItem.match(doc, startOffset);
+        match.patternName = this.name;
+        match.pattern = this.pattern;
+        return match;
+    }
 
+}
 class EmptyPattern extends PatternItem
 {
     name = "space";
@@ -44,10 +62,10 @@ class EmptyPattern extends PatternItem
             return null;
         return match;
     }
-    match(doc: TextDocument, startOffset: number): PatternMatchResult
+    match(doc: TextDocument, startOffset: number): MatchResult
     {
         let empty = EmptyPattern.skipEmpty(doc, startOffset, this.pattern.crossLine);
-        let match = new PatternMatchResult(doc, this);
+        let match = new MatchResult(doc, this);
         match.startOffset = startOffset;
         if (empty && empty[0].length > 0)
         {
@@ -71,14 +89,14 @@ class RegExpPattern extends PatternItem
         super(pattern, ignorable);
         this.regExp = reg;
     }
-    match(doc: TextDocument, startOffset: number): PatternMatchResult
+    match(doc: TextDocument, startOffset: number): MatchResult
     {
         let skip = EmptyPattern.skipEmpty(doc, startOffset, this.pattern.crossLine);
         if (skip)
             startOffset += skip[0].length;
         let text = doc.getText().substr(startOffset);
         let regMatch = this.regExp.exec(text);
-        let match = new PatternMatchResult(doc, this);
+        let match = new MatchResult(doc, this);
         match.startOffset = startOffset;
         if (!regMatch || regMatch.index !== 0)
         {
@@ -149,9 +167,9 @@ class OrderedPatternSet extends PatternItem
         let str = super.toString() + "\r\n" + this.subPatterns.map(pattern => pattern.toString()).join("\r\n").split(/\r\n/g).map(str => "\t" + str).join("\r\n");
         return str;
     }
-    match(doc: TextDocument, startOffset: number): PatternMatchResult
+    match(doc: TextDocument, startOffset: number): MatchResult
     {
-        let match = new PatternMatchResult(doc, this);
+        let match = new MatchResult(doc, this);
         match.startOffset = startOffset;
         try 
         {
@@ -195,7 +213,7 @@ class OptionalPatternSet extends OrderedPatternSet
 {
     name = "optional";
 
-    match(doc: TextDocument, startOffset: number): PatternMatchResult
+    match(doc: TextDocument, startOffset: number): MatchResult
     {
         let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
@@ -231,7 +249,7 @@ class ScopePattern extends OrderedPatternSet
         super(pattern, false);
         this.scope = scope;
     }
-    match(doc: TextDocument, startOffset: number): PatternMatchResult
+    match(doc: TextDocument, startOffset: number): MatchResult
     {
         function cleanSpace()
         {
@@ -239,14 +257,14 @@ class ScopePattern extends OrderedPatternSet
             if (skip)
                 startOffset += skip[0].length;
         }
-        let match = new PatternMatchResult(doc, this);
+        let match = new ScopeMatchResult(doc, this);
         match.startOffset = startOffset;
         try 
         {
             cleanSpace();
             // Match first pattern
             let subMatch = this.subPatterns[0].match(doc, startOffset);
-            match.children.push(subMatch);
+            match.beginMatch = subMatch;
             match.endOffset = startOffset = subMatch.endOffset;
             if (!subMatch.matched)
             {
@@ -267,11 +285,14 @@ class ScopePattern extends OrderedPatternSet
                 }
                 else
                 {
+                    if (i === this.subPatterns.length - 1)
+                    {
+                        match.endMatch = subMatch;
+                        break;
+                    }
                     match.children.push(subMatch);
                     match.endOffset = startOffset = subMatch.endOffset;
                     hasMatched = true;
-                    if (i === this.subPatterns.length - 1)
-                        break;
 
                     cleanSpace();
                 }
@@ -300,16 +321,16 @@ class ScopePattern extends OrderedPatternSet
                 i = 0;
                 hasMatched = false;
             }
-                
-            if (match.children.length === 0)
+            if (!match.endMatch)
             {
-                match.endOffset = match.startOffset + 1;
+                match.startOffset = match.beginMatch.startOffset;
                 match.matched = false;
+                return match;
             }
             else
             {
-                match.endOffset = match.children[match.children.length - 1].endOffset;
-                match.startOffset = match.children[0].startOffset;
+                match.startOffset = match.beginMatch.startOffset;
+                match.endOffset = match.endMatch.endOffset;
                 match.matched = true;
             }
         }
@@ -329,8 +350,58 @@ class Grammar extends ScopePattern
         super(null, null);
         this.grammar = grammar;
     }
+    match(doc: TextDocument, startOffset: number=0): MatchResult
+    {
+        function cleanSpace()
+        {
+            let skip = EmptyPattern.skipEmpty(doc, startOffset, true);
+            if (skip)
+                startOffset += skip[0].length;
+        }
+        let match = new ScopeMatchResult(doc, this);
+        let end = doc.getText().length;
+        match.startOffset = 0;
+        while (startOffset != end)
+        {
+            let hasMatched = false;
+            for (let i = 0; i < this.subPatterns.length; i++)
+            {
+                let subMatch = this.subPatterns[i].match(doc, startOffset);
+                if (!subMatch.matched)
+                    continue;
+                hasMatched = true;
+                match.children.push(subMatch);
+                match.endOffset = startOffset = subMatch.endOffset;
+                cleanSpace();
+                break;
+            }
+
+            if (!hasMatched)
+            {
+                let unMatched = new UnMatchedText(doc, this.scope);
+                unMatched.startOffset = startOffset;
+                match.children.push(unMatched);
+
+                let pos = doc.positionAt(startOffset);
+                pos.line++;
+                pos.character = 0;
+                startOffset = doc.offsetAt(pos);
+                unMatched.endOffset = startOffset - 1;
+                // Chceck if reach end
+                let pos2 = doc.positionAt(startOffset);
+                if (pos2.line !== pos.line)
+                {
+                    break;
+                }
+                cleanSpace();
+            }
+        }
+        match.endOffset = end;
+        match.matched = true;
+        return match;
+    }
 }
-class PatternMatchResult
+class MatchResult
 {
     document: TextDocument;
     patternItem: PatternItem;
@@ -339,11 +410,13 @@ class PatternMatchResult
     startOffset: number;
     endOffset: number;
     matched: boolean = true;
-    children: PatternMatchResult[] = [];
+    children: MatchResult[] = [];
+    private _pattern: GrammarPattern = null;
     get start() { return this.document.positionAt(this.startOffset); }
     get end() { return this.document.positionAt(this.endOffset); }
     get text() { return this.document.getText({ start: this.start, end: this.end }); }
-    get pattern() { return this.patternItem.pattern; }
+    get pattern() { return this._pattern ? this._pattern : this.patternItem.pattern; }
+    set pattern(value) { this._pattern = value;}
     constructor(doc: TextDocument, patternItem: PatternItem)
     {
         this.document = doc;
@@ -354,7 +427,46 @@ class PatternMatchResult
         return this.text;
     }
 }
-class UnMatchedText extends PatternMatchResult
+class PatternMatchResult extends MatchResult
+{
+    private matchesDict: Map<string, MatchResult[]> = new Map<string, MatchResult[]>();
+    private _matchesList: MatchResult[] = null;
+    private get allMathches(): MatchResult[]
+    {
+        if (!this._matchesList)
+        {
+            let list = [this.children[0]];
+            for (let i = 0; i < list.length; i++)
+            {
+                if (list[i] instanceof PatternMatchResult)
+                    return;
+                list.concat(list[i].children);
+            }
+            this._matchesList = list;
+        }
+        return this._matchesList;
+    }
+    getMatch(name: string): MatchResult[]
+    {
+        if (this.children.length <= 0)
+            return null;
+        /*if (this.matchesDict.get(name))
+            return this.matchesDict.get(name);*/
+        return linq.from(this.allMathches).where(match => match.patternName === name).toArray();
+        
+    }
+}
+class ScopeMatchResult extends MatchResult
+{
+    beginMatch: MatchResult;
+    endMatch: MatchResult;
+    constructor(doc: TextDocument, scope: ScopePattern)
+    {
+        super(doc, scope);
+        this.scope = scope.scope;
+    }
+}
+class UnMatchedText extends MatchResult
 {
     matched = false;
     constructor(doc: TextDocument, scope: GrammarScope)
@@ -396,9 +508,13 @@ class GrammarPattern
     crossLine?: boolean = false;
     scopes?: ScopeDictionary;
     recursive?: boolean = false;
+    
+    onMatched?: PatternMatchedCallback;
+    _parent?: GrammarPattern;
+    _nameInParent?: string;
+    _scope?: GrammarScope;
     _compiledPattern?: PatternItem;
     _grammar?: LanguageGrammar;
-    _scope?: GrammarScope;
     _compiling?: boolean = false;
 }
 class LanguageGrammar
@@ -429,6 +545,7 @@ function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
         {
             pattern.dictionary[name]._grammar = pattern._grammar;
             subPattern = compilePattern(pattern.dictionary[name]);
+            subPattern
         }
         else if (pattern._grammar.patternRepository && pattern._grammar.patternRepository[name])
         {
@@ -438,7 +555,7 @@ function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
         else
             subPattern = new IdentifierPattern(pattern);
         subPattern.ignorable = false;
-        return subPattern;
+        return new NamedPattern(pattern,name,subPattern);
     }
     else if (item[0] === "[" && item[item.length - 1] === "]")
     {
@@ -587,9 +704,12 @@ function compilePattern(pattern: GrammarPattern): PatternItem
     {
         if (patternList.subPatterns[0] == patternList)
             throw new Error("Looped.");
-        patternList.subPatterns[0].ignorable = true;
-        pattern._compiledPattern = patternList.subPatterns[0];
-        return patternList.subPatterns[0];
+        if (!pattern.onMatched)
+        {
+            patternList.subPatterns[0].ignorable = true;
+            pattern._compiledPattern = patternList.subPatterns[0];
+            return patternList.subPatterns[0];
+        }
     }
     return patternList;
 }
@@ -624,12 +744,14 @@ function compileGrammar(grammarDeclare: LanguageGrammar):Grammar
     return grammar;
 }
 
-function matchGrammar(grammar: Grammar, doc: TextDocument): PatternMatchResult
+function matchGrammar(grammar: Grammar, doc: TextDocument): MatchResult
 {
-    let root = new PatternMatchResult(doc, grammar);
-    root.startOffset = 0;
-    root.endOffset = doc.getText().length;
-    return grammar.match(doc, 0);
+    let root = grammar.match(doc, 0);
+    if (root.matched)
+    {
+        
+    }
+    return root;
 }
 function includePattern(patternName: string): GrammarPattern
 {
