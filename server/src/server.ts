@@ -46,9 +46,9 @@ connection.onCompletion((docPos: CompletionParams): CompletionItem[] =>
     let grammarDeclare = grammarShaderLab;
     let grammar = compileGrammar(grammarDeclare);
     console.log(grammar.toString());
-    console.log(new Date().getTime());
+    connection.console.log(new Date().getTime().toString());
     let match = matchGrammar(grammar, doc);
-    console.log(new Date().getTime());
+    connection.console.log(new Date().getTime().toString());
     if (doc)
     {
         let code = new ShaderCode(doc);

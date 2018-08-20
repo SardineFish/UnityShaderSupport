@@ -168,6 +168,15 @@ const renderSetupPattern: GrammarPattern = {
         }
     }
 };
+const variableDeclare: GrammarPattern = {
+    name: "Variable Declare",
+    patterns: ["<type> < > <name> [:<semantics>];"],
+    dictionary: {
+        "type": { patterns: ["<identifier>"] },
+        "name": { patterns: ["<identifier>"] },
+        "semantics": { patterns: ["<identifier>"] }
+    }
+}
 const cgProgram: GrammarPattern = {
     name: "Cg Program",
     patterns: ["{cgProgram}"],
@@ -176,7 +185,21 @@ const cgProgram: GrammarPattern = {
             begin: "CGPROGRAM",
             end: "ENDCG",
             patterns: [
-                
+                {
+                    name: "Preprocessor",
+                    patterns: [
+                        "#pragma <cmd> <name>[ <options>...]",
+                        "#pragma <cmd>[ <feature>...]",
+                        "#pragma <cmd>"
+                    ],
+                    keepSpace: true,
+                    dictionary: {
+                        "name": {
+                            patterns: ["<number>", "<identifier>"]
+                        }
+                    }
+                },
+                variableDeclare
             ]
         }
     }

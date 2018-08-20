@@ -62,7 +62,7 @@ Shader <name>
 								<)>
 						<)>
 						<=>
-						<nest>
+						<optional>
 							[number]
 							[nest]
 								<string>
@@ -96,7 +96,7 @@ Shader <name>
 					[nest]
 						<identifier>
 						<space>
-						<nest>
+						<optional>
 							[identifier]
 							[string]
 							[number]
@@ -116,16 +116,62 @@ Shader <name>
 							[nest]
 								<identifier>
 								<space>
-								<nest>
+								<optional>
 									[identifier]
 									[string]
 									[number]
 							[Scope]
 								<CGPROGRAM>
+								[optional]
+									[nest]
+										<#pragma>
+										<space>
+										<identifier>
+										<space>
+										<optional>
+											[number]
+											[identifier]
+										[nest]
+											<space>
+											<identifier>
+									[nest]
+										<#pragma>
+										<space>
+										<identifier>
+										[nest]
+											<space>
+											<identifier>
+									[nest]
+										<#pragma>
+										<space>
+										<identifier>
 								<ENDCG>
 							<}>
 					[Scope]
 						<CGPROGRAM>
+						[optional]
+							[nest]
+								<#pragma>
+								<space>
+								<identifier>
+								<space>
+								<optional>
+									[number]
+									[identifier]
+								[nest]
+									<space>
+									<identifier>
+							[nest]
+								<#pragma>
+								<space>
+								<identifier>
+								[nest]
+									<space>
+									<identifier>
+							[nest]
+								<#pragma>
+								<space>
+								<identifier>
 						<ENDCG>
 					<}>
 			<}>

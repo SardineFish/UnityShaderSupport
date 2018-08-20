@@ -370,6 +370,36 @@ class NestedPattern extends PatternItem
         return match;
     }
 }
+class OptionalPatterns extends NestedPattern
+{
+    name = "optional";
+
+    match(doc: TextDocument, startOffset: number): GrammarMatch
+    {
+        let match = new GrammarMatch(doc, this);
+        match.startOffset = startOffset;
+        for (let i = 0; i < this.subPatterns.length; i++)
+        {
+            let subMatch = this.subPatterns[i].match(doc, startOffset);
+            if (!subMatch.matched)
+                continue;
+            match.children.push(subMatch);
+            break;
+        }
+        if (match.children.length === 0)
+        {
+            match.endOffset = match.startOffset + 1;
+            match.matched = false;
+        }
+        else
+        {
+            match.endOffset = match.children[match.children.length - 1].endOffset;
+            match.startOffset = match.children[0].startOffset;
+            match.matched = true;
+        }
+        return match;
+    }
+}
 class PatternScope extends NestedPattern
 {
     name = "scope";
@@ -536,6 +566,7 @@ class GrammarPattern
     patterns: string[];
     caseInsensitive?: boolean = false;
     dictionary?: PatternDictionary;
+    keepSpace?: boolean = false;
     name?: string;
     crossLine?: boolean = false;
     scopes?: PatternScopeDictionary;
@@ -640,6 +671,8 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
                 if (words !== "")
                     patternItem.addSubPattern(new TextPattern(pattern, words));
                 words = "";
+                if (pattern.keepSpace)
+                    patternItem.addSubPattern(new EmptyPattern(pattern, false));
                 continue;
             }
             else if (isBracketEnd(item[i]))
@@ -692,7 +725,7 @@ function compilePattern(pattern: GrammarPattern): PatternItem
 {
     if (pattern === GrammarPattern.String)
         return new StringPattern(pattern);
-    let patternList: NestedPattern = new NestedPattern(pattern, true);
+    let patternList: OptionalPatterns = new OptionalPatterns(pattern, true);
     pattern.patterns.forEach(pt =>
     {
         let subPattern = analysePatternItem(pt, pattern);
