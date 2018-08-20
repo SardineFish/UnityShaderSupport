@@ -6,193 +6,14 @@ type DocumentCompletionCallback = () => CompletionItem[];
 type DocumentDiagnoseCallback = (text: string, range: Range) => Diagnostic[];
 type PatternItemDictionary = { [key: string]: (pattern: GrammarPattern) => PatternItem };
 
-class Code
-{
-    scopes: Scope;
-}
-class Scope
-{
-    document: TextDocument;
-    startOffset: number = 0;
-    endOffset: number = 0;
-    scopes: Scope[] = [];
-    scopeDeclare: ScopeDeclare;
-    constructor(doc: TextDocument, declare: ScopeDeclare)
-    {
-        this.scopeDeclare = declare;
-        this.document = doc;
-    }
-    get startPosition() { return this.document.positionAt(this.startOffset); }
-    get endPosition() { return this.document.positionAt(this.endOffset); }
-    get text() { return this.document.getText({ start: this.startPosition, end: this.endPosition }); }
-}
-class ShaderCode implements Code
-{
-    scopes: Scope;
-    constructor(doc: TextDocument)
-    {
-        //this.scopes = scopeMatch(sourceShaderLab, doc, 0);
-    }
-}
-class ScopeDeclare
-{
-    name?: string;
-    begin?: RegExp;
-    end?: RegExp;
-    scopes?: ScopeDeclare[];
-    _matchbegin?: RegExpMatchArray;
-    _matchEnd?: RegExpExecArray;
-    patterns?: PatternDeclare[] = [];
-}
-class MatchCapturePattern
-{
-    name?: string;
-    match?: RegExp;
-    default?: boolean = false;
-    captures?: MatchCaptures = new MatchCaptures();
-    onCompletion?: DocumentCompletionCallback;
-}
-class MatchCaptures
-{
-    [key: string]: PatternDeclare;
-}
-class PatternDeclare
-{
-    name?: string;
-    match?: RegExp;
-    default?: boolean = false;
-    //patterns?: PatternDeclare[] = [];
-    captures?: MatchCaptures = new MatchCaptures();
-    onCompletion?: DocumentCompletionCallback;
-    diagnostic?: Diagnostic;
-    unmatched?: Diagnostic;
-}
-function matchInRange(reg: RegExp, doc: TextDocument, start: number, end: number): RegExpExecArray
-{
-    let subDoc = doc.getText({ start: doc.positionAt(start), end: doc.positionAt(end) });
-    return reg.exec(subDoc);
-}
-function scopeMatch(scopeDeclare: ScopeDeclare, doc: TextDocument, startOffset: number = 0, endOffset: number = doc.getText().length - 1): Scope
-{
-    let nextStartOffset = startOffset;
-    let match: RegExpExecArray = null;
-    if (scopeDeclare.begin)
-    {
-        let subDoc = doc.getText({ start: doc.positionAt(startOffset), end: doc.positionAt(endOffset) });
-        match = scopeDeclare.begin.exec(subDoc);
-        if (scopeDeclare.begin && !match)
-            return;
-        if (match)
-        {
-            nextStartOffset = startOffset + match.index + match[0].length;
-        }
-    }
-    let scope = new Scope(doc, scopeDeclare);
-    if (match)
-        scope.startOffset = startOffset + match.index;
-
-    let hasSubScope = false;
-    do
-    {
-        hasSubScope = false;
-
-        // To get the headmost sub-scope
-        let subScopeList = linq.from(scopeDeclare.scopes)
-            .orderBy(scope =>
-            {
-                scope._matchbegin = matchInRange(scope.begin, doc, nextStartOffset, endOffset);
-                if (scope._matchbegin)
-                    return scope._matchbegin.index;
-                return Number.MAX_SAFE_INTEGER;
-            }).toArray();
-
-        // Check if sub-scope is out of current scope
-        let endMatch = null;
-        if (scopeDeclare.end)
-        {
-            endMatch = matchInRange(scopeDeclare.end, doc, nextStartOffset, endOffset);
-            if (!endMatch)
-                return null;
-        }
-
-        for (let i = 0; i < subScopeList.length; i++)
-        {
-            // Remove the sub-scope which is out of current scope
-            if (!subScopeList[i]._matchbegin)
-                continue;
-            if (endMatch && endMatch.index <= subScopeList[i]._matchbegin.index)
-                break;
-
-            let subScope = scopeMatch(subScopeList[i], doc, nextStartOffset, endOffset);
-            if (subScope)
-            {
-                scope.scopes.push(subScope);
-                nextStartOffset = subScope.endOffset + 1;
-                hasSubScope = true;
-                break;
-            }
-        }
-    }
-    while (hasSubScope);
-
-    if (!scopeDeclare.end)
-    {
-        scope.endOffset = endOffset;
-    }
-    else
-    {
-        match = matchInRange(scopeDeclare.end, doc, nextStartOffset, endOffset);
-        if (!match)
-            return null;
-        endOffset = nextStartOffset + match.index + match[0].length;
-        scope.endOffset = endOffset;
-    }
-    return scope;
-
-}
-
-function diagnostic(pattern: PatternDeclare, doc: TextDocument, startOffset: number, endOffset: number): Diagnostic[]
-{
-    let diagnostics: Diagnostic[] = [];
-    if (pattern.match)
-    {
-        let match = matchInRange(pattern.match, doc, startOffset, endOffset);
-        if (pattern.captures)
-        {
-            for (let i = 0; i < match.length; i++)
-            {
-                if (!pattern.captures[i])
-                    continue;
-
-                // Handle unmatch diagnostic
-                if (match[i] === undefined && pattern.captures[i].unmatched)
-                {
-                    let diag = pattern.captures[i].unmatched;
-                    diag.range = { start: doc.positionAt(startOffset + match.index), end: doc.positionAt(startOffset + match.index + match[0].length) };
-                    diagnostics.push(diag);
-                }
-
-
-            }
-        }
-    }
-    return diagnostics;
-}
-
-enum MatchResult
-{
-    NotMatched = 0,
-    Matched = 1,
-    Skip = 2,
-}
 abstract class PatternItem
 {
     name: string = "pattern";
-    parent?: NestedPattern;
+    parent?: OrderedPatternSet;
     ignorable: boolean = false;
     multi: boolean = false;
     pattern: GrammarPattern;
-    abstract match(doc: TextDocument, startOffset: number): GrammarMatch;
+    abstract match(doc: TextDocument, startOffset: number): PatternMatchResult;
     constructor(pattern: GrammarPattern, ignorable = false)
     {
         this.pattern = pattern;
@@ -223,10 +44,10 @@ class EmptyPattern extends PatternItem
             return null;
         return match;
     }
-    match(doc: TextDocument, startOffset: number): GrammarMatch
+    match(doc: TextDocument, startOffset: number): PatternMatchResult
     {
         let empty = EmptyPattern.skipEmpty(doc, startOffset, this.pattern.crossLine);
-        let match = new GrammarMatch(doc, this);
+        let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
         if (empty && empty[0].length > 0)
         {
@@ -250,14 +71,14 @@ class RegExpPattern extends PatternItem
         super(pattern, ignorable);
         this.regExp = reg;
     }
-    match(doc: TextDocument, startOffset: number): GrammarMatch
+    match(doc: TextDocument, startOffset: number): PatternMatchResult
     {
         let skip = EmptyPattern.skipEmpty(doc, startOffset, this.pattern.crossLine);
         if (skip)
             startOffset += skip[0].length;
         let text = doc.getText().substr(startOffset);
         let regMatch = this.regExp.exec(text);
-        let match = new GrammarMatch(doc, this);
+        let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
         if (!regMatch || regMatch.index !== 0)
         {
@@ -313,7 +134,7 @@ class IdentifierPattern extends RegExpPattern
     }
 }
 
-class NestedPattern extends PatternItem
+class OrderedPatternSet extends PatternItem
 {
     name = "nest";
     subPatterns: PatternItem[] = [];
@@ -328,9 +149,9 @@ class NestedPattern extends PatternItem
         let str = super.toString() + "\r\n" + this.subPatterns.map(pattern => pattern.toString()).join("\r\n").split(/\r\n/g).map(str => "\t" + str).join("\r\n");
         return str;
     }
-    match(doc: TextDocument, startOffset: number): GrammarMatch
+    match(doc: TextDocument, startOffset: number): PatternMatchResult
     {
-        let match = new GrammarMatch(doc, this);
+        let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
         try 
         {
@@ -370,13 +191,13 @@ class NestedPattern extends PatternItem
         return match;
     }
 }
-class OptionalPatterns extends NestedPattern
+class OptionalPatternSet extends OrderedPatternSet
 {
     name = "optional";
 
-    match(doc: TextDocument, startOffset: number): GrammarMatch
+    match(doc: TextDocument, startOffset: number): PatternMatchResult
     {
-        let match = new GrammarMatch(doc, this);
+        let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
         for (let i = 0; i < this.subPatterns.length; i++)
         {
@@ -400,7 +221,7 @@ class OptionalPatterns extends NestedPattern
         return match;
     }
 }
-class PatternScope extends NestedPattern
+class ScopePattern extends OrderedPatternSet
 {
     name = "scope";
     scope: GrammarScope;
@@ -410,7 +231,7 @@ class PatternScope extends NestedPattern
         super(pattern, false);
         this.scope = scope;
     }
-    match(doc: TextDocument, startOffset: number): GrammarMatch
+    match(doc: TextDocument, startOffset: number): PatternMatchResult
     {
         function cleanSpace()
         {
@@ -418,7 +239,7 @@ class PatternScope extends NestedPattern
             if (skip)
                 startOffset += skip[0].length;
         }
-        let match = new GrammarMatch(doc, this);
+        let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
         try 
         {
@@ -499,16 +320,17 @@ class PatternScope extends NestedPattern
         return match;
     }
 }
-class Grammar extends NestedPattern
+class Grammar extends ScopePattern
 {
     name = "grammar";
-    grammar: GrammarDeclare;
-    constructor(grammar: GrammarDeclare)
+    grammar: LanguageGrammar;
+    constructor(grammar: LanguageGrammar)
     {
-        super(null, false);
+        super(null, null);
+        this.grammar = grammar;
     }
 }
-class GrammarMatch
+class PatternMatchResult
 {
     document: TextDocument;
     patternItem: PatternItem;
@@ -517,7 +339,7 @@ class GrammarMatch
     startOffset: number;
     endOffset: number;
     matched: boolean = true;
-    children: GrammarMatch[] = [];
+    children: PatternMatchResult[] = [];
     get start() { return this.document.positionAt(this.startOffset); }
     get end() { return this.document.positionAt(this.endOffset); }
     get text() { return this.document.getText({ start: this.start, end: this.end }); }
@@ -532,7 +354,7 @@ class GrammarMatch
         return this.text;
     }
 }
-class UnMatchedText extends GrammarMatch
+class UnMatchedText extends PatternMatchResult
 {
     matched = false;
     constructor(doc: TextDocument, scope: GrammarScope)
@@ -545,7 +367,7 @@ class PatternDictionary
 {
     [key: string]: GrammarPattern;
 }
-class PatternScopeDictionary
+class ScopeDictionary
 {
     [key: string]: GrammarScope;
 }
@@ -558,8 +380,8 @@ class GrammarScope
     name?: string;
     ignore?: GrammarPattern;
     pairMatch?: string[][];
-    _compiledPattern?: PatternScope;
-    _grammar?: GrammarDeclare
+    _compiledPattern?: ScopePattern;
+    _grammar?: LanguageGrammar
 }
 class GrammarPattern
 {
@@ -572,14 +394,14 @@ class GrammarPattern
     keepSpace?: boolean = false;
     name?: string;
     crossLine?: boolean = false;
-    scopes?: PatternScopeDictionary;
+    scopes?: ScopeDictionary;
     recursive?: boolean = false;
     _compiledPattern?: PatternItem;
-    _grammar?: GrammarDeclare;
+    _grammar?: LanguageGrammar;
     _scope?: GrammarScope;
     _compiling?: boolean = false;
 }
-class GrammarDeclare
+class LanguageGrammar
 {
     patterns?: GrammarPattern[];
     name?: string;
@@ -587,7 +409,7 @@ class GrammarDeclare
     stringDelimiter?: string[];
     pairMatch?: string[][];
     patternRepository?: PatternDictionary;
-    scopeRepository?:PatternScopeDictionary
+    scopeRepository?:ScopeDictionary
 }
 function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
 {
@@ -665,7 +487,7 @@ function analysePatternItem(item: string, pattern: GrammarPattern): PatternItem
     const isSpace = (chr: string): boolean => spaceChars.indexOf(chr) >= 0;
     enum State { CollectWords, MatchBracket };
 
-    let patternItem: NestedPattern = new NestedPattern(pattern, false);
+    let patternItem: OrderedPatternSet = new OrderedPatternSet(pattern, false);
     let state:State = State.CollectWords;
     let bracketDepth = 0;
     let startBracket = "";
@@ -751,7 +573,7 @@ function compilePattern(pattern: GrammarPattern): PatternItem
     if (pattern._compiledPattern)
         return pattern._compiledPattern;
     pattern._compiling = true;
-    let patternList: OptionalPatterns = new OptionalPatterns(pattern, true);
+    let patternList: OptionalPatternSet = new OptionalPatternSet(pattern, true);
     pattern._compiledPattern = patternList;
     pattern.patterns.forEach(pt =>
     {
@@ -771,11 +593,11 @@ function compilePattern(pattern: GrammarPattern): PatternItem
     }
     return patternList;
 }
-function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
+function compileScope(scope: GrammarScope, pattern:GrammarPattern): ScopePattern
 {
     if (scope._compiledPattern)
         return scope._compiledPattern;
-    let patternList = new PatternScope(pattern, scope);
+    let patternList = new ScopePattern(pattern, scope);
     patternList.addSubPattern(new TextPattern(pattern, scope.begin, false));
     scope._compiledPattern = patternList;
     scope.patterns.forEach(pt =>
@@ -790,7 +612,7 @@ function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
     patternList.name = scope.name ? scope.name : "Scope";
     return patternList;
 }
-function compileGrammar(grammarDeclare: GrammarDeclare):Grammar
+function compileGrammar(grammarDeclare: LanguageGrammar):Grammar
 {
     let grammar = new Grammar(grammarDeclare);
     grammarDeclare.patterns.forEach(pattern =>
@@ -802,15 +624,15 @@ function compileGrammar(grammarDeclare: GrammarDeclare):Grammar
     return grammar;
 }
 
-function matchGrammar(grammar: Grammar, doc: TextDocument): GrammarMatch
+function matchGrammar(grammar: Grammar, doc: TextDocument): PatternMatchResult
 {
-    let root = new GrammarMatch(doc, grammar);
+    let root = new PatternMatchResult(doc, grammar);
     root.startOffset = 0;
     root.endOffset = doc.getText().length;
     return grammar.match(doc, 0);
 }
-function include(patternName: string): GrammarPattern
+function includePattern(patternName: string): GrammarPattern
 {
     return { patterns: [`<${patternName}>`] };
 }
-export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern, compileGrammar, matchGrammar, GrammarScope, include };
+export { LanguageGrammar, GrammarPattern, compileGrammar, matchGrammar, GrammarScope, includePattern };

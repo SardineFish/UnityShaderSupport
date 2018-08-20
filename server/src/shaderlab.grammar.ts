@@ -1,99 +1,5 @@
-import { DiagnosticSeverity, Diagnostic } from "vscode-languageserver";
-import { ScopeDeclare, GrammarDeclare, GrammarPattern, GrammarScope, include } from "./grammar";
-/*class SourceShaderLab extends Scope
-{
-    scopes: Scope[] = [];
-    startOffset: number = 0;
-    endOffset: number = 0;
-    start: RegExp = /Shader.*{/i;
-    end: RegExp = /}/;
-
-}*/
-const DiagnosticSource: string = "ShaderLab Intellicense";
-const blockScope: ScopeDeclare = {
-    name: "Block",
-    begin: /{/,
-    end: /}/
-};
-const tagScope: ScopeDeclare = {
-    name: "Tags",
-    begin: /Tags.*{/i,
-    end: /}/
-};
-const cgScope: ScopeDeclare = {
-    name: "Cg Program",
-    begin: /CGPROGRAM/,
-    end: /ENDCG/
-};
-const passDeclare: ScopeDeclare = {
-    name: "Pass",
-    begin: /Pass.*{/i,
-    end: /}/,
-    scopes: [
-        tagScope,
-        cgScope,
-        blockScope
-    ]
-};
-const sourceShaderLab: ScopeDeclare = {
-    scopes: [
-        {
-            name: "ShaderBlock",
-            begin: /Shader.*{/i,
-            end: /}/,
-            patterns: [
-                {
-                    match: /(Shader)\s+(\".*\")?\s*{/i,
-                    captures: {
-                        "1": {
-                            unmatched: {
-                                range: null,
-                                severity: DiagnosticSeverity.Error,
-                                message: "Shader name required.",
-                                source: DiagnosticSource
-                            }
-                        }
-                    }
-                },
-                {
-                    match: /Properties\s*$/i,
-                    diagnostic: {
-                        range: null,
-                        severity: DiagnosticSeverity.Error,
-                        message: "Missing {",
-                        source: DiagnosticSource
-                    }
-                }
-            ],
-            scopes: [
-                {
-                    name: "Properties",
-                    begin: /Properties.*{/i,
-                    end: /}/,
-                    scopes: [{
-                        name: "Block Value",
-                        begin: /{/,
-                        end: /}/,
-                    }]
-                },
-                {
-                    name: "SubShader",
-                    begin: /SubShader.*{/i,
-                    end: /}/,
-                    scopes: [
-                        tagScope,
-                        passDeclare,
-                        cgScope,
-                        blockScope
-                    ]
-                }
-            ]
-        }
-    ]
-}
-
-
-const grammarShaderLab: GrammarDeclare = {
+import { LanguageGrammar, GrammarPattern, includePattern } from "./grammar";
+const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
         ["/*", "*/"],
@@ -179,10 +85,10 @@ const grammarShaderLab: GrammarDeclare = {
                     begin: "{",
                     end: "}",
                     patterns: [
-                        include("tagsPattern"),
-                        include("renderSetupPattern"),
-                        include("pass"),
-                        include("cgProgram")
+                        includePattern("tagsPattern"),
+                        includePattern("renderSetupPattern"),
+                        includePattern("pass"),
+                        includePattern("cgProgram")
                     ]
                 }
             }
@@ -197,9 +103,9 @@ const grammarShaderLab: GrammarDeclare = {
                     begin: "{",
                     end: "}",
                     patterns: [
-                        include("tagsPattern"),
-                        include("renderSetupPattern"),
-                        include("cgProgram")
+                        includePattern("tagsPattern"),
+                        includePattern("renderSetupPattern"),
+                        includePattern("cgProgram")
                     ]
                 }
             }
@@ -258,8 +164,8 @@ const grammarShaderLab: GrammarDeclare = {
                                 }
                             }
                         },
-                        include("variableDeclare"),
-                        include("functionDefinition")
+                        includePattern("variableDeclare"),
+                        includePattern("functionDefinition")
                     ]
                 }
             }
@@ -345,7 +251,7 @@ const grammarShaderLab: GrammarDeclare = {
             begin: "{",
             end: "}",
             patterns: [
-                include("variableDeclare"),
+                includePattern("variableDeclare"),
                 {
                     name: "Statement",
                     patterns: ["<expression>;"]

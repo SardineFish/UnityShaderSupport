@@ -1,7 +1,7 @@
 "use strict";
 
 import { createConnection, ProposedFeatures, TextDocuments, InitializeParams, DidChangeConfigurationNotification, TextDocument, TextDocumentPositionParams, CompletionItem, CompletionParams, CompletionItemKind } from "vscode-languageserver";
-import { ShaderCode, compileGrammar, matchGrammar } from "./grammar";
+import { compileGrammar, matchGrammar } from "./grammar";
 import grammarShaderLab from "./shaderlab.grammar";
 
 
@@ -49,10 +49,6 @@ connection.onCompletion((docPos: CompletionParams): CompletionItem[] =>
     connection.console.log(new Date().getTime().toString());
     let match = matchGrammar(grammar, doc);
     connection.console.log(new Date().getTime().toString());
-    if (doc)
-    {
-        let code = new ShaderCode(doc);
-    }
     return [];
 });
 
