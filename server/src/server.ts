@@ -49,7 +49,7 @@ connection.onCompletion((docPos: CompletionParams): CompletionItem[] =>
     connection.console.log(new Date().getTime().toString());
     let match = matchGrammar(grammar, doc);
     connection.console.log(new Date().getTime().toString());
-    return [];
+    return match.requestCompletion(docPos.position);
 });
 
 documents.listen(connection);

@@ -64,7 +64,7 @@ const grammarShaderLab: LanguageGrammar = {
                 "(<number>, <number>, <number>, <number>)"
             ]
         },
-        "propertyType": {
+        "propType": {
             name: "Property Type",
             patterns: ["<typeName>[(<number>[, <number> ...])]"],
             dictionary: {
