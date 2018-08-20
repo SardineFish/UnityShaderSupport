@@ -4,6 +4,7 @@ import linq from "linq";
 
 type DocumentCompletionCallback = (pos:Position) => CompletionItem[];
 type PatternMatchedCallback = (patternMatch: PatternMatchResult) => void;
+type ScopeMatchedCallback = (scopeMatch: ScopeMatchResult) => void;
 type DocumentDiagnoseCallback = (text: string, range: Range) => Diagnostic[];
 type PatternItemDictionary = { [key: string]: (pattern: GrammarPattern) => PatternItem };
 
@@ -461,6 +462,9 @@ class PatternMatchResult extends MatchResult
     }
     processSubMatches()
     {
+        if (this.pattern.onMatched)
+            this.pattern.onMatched(this);
+
         this.allMathches.forEach(match =>
         {
             if (match != this)
@@ -471,8 +475,6 @@ class PatternMatchResult extends MatchResult
             } 
             else if (match instanceof PatternMatchResult)
             {
-                if (match.pattern.onMatched)
-                    match.pattern.onMatched(match);
                 match.processSubMatches();
             }
         });
@@ -489,6 +491,9 @@ class ScopeMatchResult extends MatchResult
     }
     processSubMatches()
     {
+        if (this.scope && this.scope.onMatched)
+            this.scope.onMatched(this);
+
         let matchList: MatchResult[] = [this];
         for (let i = 0; i < matchList.length; i++)
         {
@@ -503,8 +508,6 @@ class ScopeMatchResult extends MatchResult
                 }
                 else if (subMatch instanceof PatternMatchResult)
                 {
-                    if (subMatch.pattern.onMatched)
-                        subMatch.pattern.onMatched(subMatch);
                     subMatch.processSubMatches();
                     continue;
                 }
@@ -543,6 +546,7 @@ class GrammarScope
     name?: string;
     ignore?: GrammarPattern;
     pairMatch?: string[][];
+    onMatched?: ScopeMatchedCallback;
     _compiledPattern?: ScopePattern;
     _grammar?: LanguageGrammar
 }
