@@ -145,6 +145,41 @@ Shader <name>
 										<#pragma>
 										<space>
 										<identifier>
+								[nest]
+									<identifier>
+									<space>
+									<identifier>
+									[nest]
+										<:>
+										<identifier>
+									[nest]
+										<=>
+										<identifier>
+									<;>
+								[nest]
+									<identifier>
+									<identifier>
+									<(>
+									[nest]
+										<identifier>
+										<space>
+										<identifier>
+										[nest]
+											<:>
+											<identifier>
+									[nest]
+										<,>
+										<nest>
+											<identifier>
+											<space>
+											<identifier>
+											[nest]
+												<:>
+												<identifier>
+									<)>
+									[nest]
+										<:>
+										<identifier>
 								<ENDCG>
 							<}>
 					[Scope]
@@ -171,6 +206,41 @@ Shader <name>
 							[nest]
 								<#pragma>
 								<space>
+								<identifier>
+						[nest]
+							<identifier>
+							<space>
+							<identifier>
+							[nest]
+								<:>
+								<identifier>
+							[nest]
+								<=>
+								<identifier>
+							<;>
+						[nest]
+							<identifier>
+							<identifier>
+							<(>
+							[nest]
+								<identifier>
+								<space>
+								<identifier>
+								[nest]
+									<:>
+									<identifier>
+							[nest]
+								<,>
+								<nest>
+									<identifier>
+									<space>
+									<identifier>
+									[nest]
+										<:>
+										<identifier>
+							<)>
+							[nest]
+								<:>
 								<identifier>
 						<ENDCG>
 					<}>

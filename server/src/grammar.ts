@@ -214,7 +214,7 @@ class EmptyPattern extends PatternItem
     static skipEmpty(doc: TextDocument, startOffset: number, crossLine = false): RegExpExecArray
     {
         const reg = crossLine ?
-            /((?:\s|\/\*(?!\/).*?\*\/)*)(\/\/.*[\r]?[\n]?)?/
+            /(((?:\s|\/\*(?!\/).*?\*\/)*)(\/\/.*[\r]?[\n]?)?)*/
             :
             /((?:[ \t]|\/\*(?!\/).*?\*\/)*)?/;
         const text = doc.getText().substr(startOffset);
@@ -422,6 +422,7 @@ class PatternScope extends NestedPattern
         match.startOffset = startOffset;
         try 
         {
+            cleanSpace();
             // Match first pattern
             let subMatch = this.subPatterns[0].match(doc, startOffset);
             match.children.push(subMatch);
@@ -557,6 +558,8 @@ class GrammarScope
     name?: string;
     ignore?: GrammarPattern;
     pairMatch?: string[][];
+    _compiledPattern?: PatternScope;
+    _grammar?: GrammarDeclare
 }
 class GrammarPattern
 {
@@ -570,7 +573,11 @@ class GrammarPattern
     name?: string;
     crossLine?: boolean = false;
     scopes?: PatternScopeDictionary;
-    _compiledPattern?: NestedPattern[];
+    recursive?: boolean = false;
+    _compiledPattern?: PatternItem;
+    _grammar?: GrammarDeclare;
+    _scope?: GrammarScope;
+    _compiling?: boolean = false;
 }
 class GrammarDeclare
 {
@@ -579,6 +586,8 @@ class GrammarDeclare
     ignore?: GrammarPattern;
     stringDelimiter?: string[];
     pairMatch?: string[][];
+    patternRepository?: PatternDictionary;
+    scopeRepository?:PatternScopeDictionary
 }
 function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
 {
@@ -595,7 +604,15 @@ function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
         if (buildInPattern[name])
             subPattern = buildInPattern[name](pattern);
         else if (pattern.dictionary && pattern.dictionary[name])
+        {
+            pattern.dictionary[name]._grammar = pattern._grammar;
             subPattern = compilePattern(pattern.dictionary[name]);
+        }
+        else if (pattern._grammar.patternRepository && pattern._grammar.patternRepository[name])
+        {
+            pattern._grammar.patternRepository[name]._grammar = pattern._grammar;
+            subPattern = compilePattern(pattern._grammar.patternRepository[name]);
+        }
         else
             subPattern = new IdentifierPattern(pattern);
         subPattern.ignorable = false;
@@ -618,9 +635,15 @@ function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
     else if (item[0] === "{" && item[item.length - 1] === "}")
     {
         let name = item.substr(1, item.length - 2);
-        let scope = pattern.scopes ? pattern.scopes[name] : null;
+        let scope: GrammarScope;
+        if (pattern.scopes && pattern.scopes[name])
+            scope = pattern.scopes[name];
+        else if (pattern._grammar.scopeRepository && pattern._grammar.scopeRepository[name])
+            scope = pattern._grammar.scopeRepository[name];
+        
         if (!scope)
             throw new Error("Pattern undefined.");
+        scope._grammar = pattern._grammar;
         return compileScope(scope, pattern);
     }
     else if (item.startsWith("/") && item.endsWith("/"))
@@ -725,7 +748,11 @@ function compilePattern(pattern: GrammarPattern): PatternItem
 {
     if (pattern === GrammarPattern.String)
         return new StringPattern(pattern);
+    if (pattern._compiledPattern)
+        return pattern._compiledPattern;
+    pattern._compiling = true;
     let patternList: OptionalPatterns = new OptionalPatterns(pattern, true);
+    pattern._compiledPattern = patternList;
     pattern.patterns.forEach(pt =>
     {
         let subPattern = analysePatternItem(pt, pattern);
@@ -736,18 +763,25 @@ function compilePattern(pattern: GrammarPattern): PatternItem
         throw new Error("No pattern.");
     if (patternList.count === 1)
     {
+        if (patternList.subPatterns[0] == patternList)
+            throw new Error("Looped.");
         patternList.subPatterns[0].ignorable = true;
+        pattern._compiledPattern = patternList.subPatterns[0];
         return patternList.subPatterns[0];
     }
     return patternList;
 }
 function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
 {
+    if (scope._compiledPattern)
+        return scope._compiledPattern;
     let patternList = new PatternScope(pattern, scope);
     patternList.addSubPattern(new TextPattern(pattern, scope.begin, false));
-    scope.patterns.forEach(pattern =>
+    scope._compiledPattern = patternList;
+    scope.patterns.forEach(pt =>
     {
-        let subPattern = compilePattern(pattern);
+        pt._grammar = pattern._grammar;
+        let subPattern = compilePattern(pt);
         subPattern.ignorable = true;
         subPattern.multi = true;
         patternList.addSubPattern(subPattern);
@@ -759,7 +793,12 @@ function compileScope(scope: GrammarScope, pattern:GrammarPattern): PatternScope
 function compileGrammar(grammarDeclare: GrammarDeclare):Grammar
 {
     let grammar = new Grammar(grammarDeclare);
-    grammarDeclare.patterns.forEach(pattern => grammar.addSubPattern(compilePattern(pattern)));
+    grammarDeclare.patterns.forEach(pattern =>
+    {
+        pattern._grammar = grammarDeclare;
+        let pt = compilePattern(pattern);
+        grammar.addSubPattern(pt)
+    });
     return grammar;
 }
 
@@ -770,4 +809,8 @@ function matchGrammar(grammar: Grammar, doc: TextDocument): GrammarMatch
     root.endOffset = doc.getText().length;
     return grammar.match(doc, 0);
 }
-export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern, compileGrammar, matchGrammar };
+function include(patternName: string): GrammarPattern
+{
+    return { patterns: [`<${patternName}>`] };
+}
+export { ShaderCode, Scope, ScopeDeclare, GrammarDeclare, GrammarPattern, compileGrammar, matchGrammar, GrammarScope, include };
