@@ -777,7 +777,7 @@
 		"keywords-control": {
 			"patterns": [{
 				"name": "keyword.control.shaderlab",
-				"match": "\\b(if|while|for|else|break|continue)\\b"
+				"match": "\\b(if|while|for|else|break|continue|do)\\b"
 			}]
 		},
 		"func-call": {
