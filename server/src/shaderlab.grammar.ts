@@ -199,6 +199,10 @@ const grammarShaderLab: LanguageGrammar = {
                 "type": GrammarPattern.Identifier,
                 "name": GrammarPattern.Identifier,
                 "semantics": GrammarPattern.Identifier
+            },
+            onMatched: (match) =>
+            {
+                console.log(match.text);
             }
         },
         "expression": {

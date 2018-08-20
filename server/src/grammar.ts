@@ -38,7 +38,7 @@ class NamedPattern extends PatternItem
     {
         let match = this.patternItem.match(doc, startOffset);
         match.patternName = this.name;
-        match.pattern = this.pattern;
+        //match.pattern = this.pattern;
         return match;
     }
 
@@ -358,7 +358,7 @@ class Grammar extends ScopePattern
             if (skip)
                 startOffset += skip[0].length;
         }
-        let match = new ScopeMatchResult(doc, this);
+        let match = new GrammarMatchResult(doc, this);
         let end = doc.getText().length;
         match.startOffset = 0;
         while (startOffset != end)
@@ -398,6 +398,9 @@ class Grammar extends ScopePattern
         }
         match.endOffset = end;
         match.matched = true;
+
+        match.processSubMatches();
+
         return match;
     }
 }
@@ -406,17 +409,18 @@ class MatchResult
     document: TextDocument;
     patternItem: PatternItem;
     patternName: string;
-    scope: GrammarScope;
     startOffset: number;
     endOffset: number;
     matched: boolean = true;
+    scope: GrammarScope;
     children: MatchResult[] = [];
+    matchedScope: ScopeMatchResult;
     private _pattern: GrammarPattern = null;
     get start() { return this.document.positionAt(this.startOffset); }
     get end() { return this.document.positionAt(this.endOffset); }
     get text() { return this.document.getText({ start: this.start, end: this.end }); }
     get pattern() { return this._pattern ? this._pattern : this.patternItem.pattern; }
-    set pattern(value) { this._pattern = value;}
+    set pattern(value) { this._pattern = value; }
     constructor(doc: TextDocument, patternItem: PatternItem)
     {
         this.document = doc;
@@ -438,9 +442,9 @@ class PatternMatchResult extends MatchResult
             let list = [this.children[0]];
             for (let i = 0; i < list.length; i++)
             {
-                if (list[i] instanceof PatternMatchResult)
-                    return;
-                list.concat(list[i].children);
+                if (list[i] instanceof PatternMatchResult || list[i] instanceof ScopeMatchResult)
+                    continue;
+                list = list.concat(list[i].children);
             }
             this._matchesList = list;
         }
@@ -455,6 +459,24 @@ class PatternMatchResult extends MatchResult
         return linq.from(this.allMathches).where(match => match.patternName === name).toArray();
         
     }
+    processSubMatches()
+    {
+        this.allMathches.forEach(match =>
+        {
+            if (match != this)
+                match.matchedScope = this.matchedScope;
+            if (match instanceof ScopeMatchResult)
+            {
+                match.processSubMatches();
+            } 
+            else if (match instanceof PatternMatchResult)
+            {
+                if (match.pattern.onMatched)
+                    match.pattern.onMatched(match);
+                match.processSubMatches();
+            }
+        });
+    }
 }
 class ScopeMatchResult extends MatchResult
 {
@@ -465,6 +487,35 @@ class ScopeMatchResult extends MatchResult
         super(doc, scope);
         this.scope = scope.scope;
     }
+    processSubMatches()
+    {
+        let matchList: MatchResult[] = [this];
+        for (let i = 0; i < matchList.length; i++)
+        {
+            let subMatch = matchList[i];
+            if (i > 0)
+            {
+                subMatch.matchedScope = this;
+                if (subMatch instanceof ScopeMatchResult)
+                {
+                    subMatch.processSubMatches();
+                    continue;
+                }
+                else if (subMatch instanceof PatternMatchResult)
+                {
+                    if (subMatch.pattern.onMatched)
+                        subMatch.pattern.onMatched(subMatch);
+                    subMatch.processSubMatches();
+                    continue;
+                }
+            }
+            matchList = matchList.concat(subMatch.children);
+            
+        }
+    }
+}
+class GrammarMatchResult extends ScopeMatchResult
+{
 }
 class UnMatchedText extends MatchResult
 {
