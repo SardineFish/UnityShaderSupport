@@ -1,7 +1,7 @@
 import linq from "linq"
 import { CompletionItem, CompletionItemKind } from "vscode-languageserver";
 const scalarTypes = ["float", "half", "int", "fixed"];
-const otherTypes = ["bool"];
+const otherTypes = ["bool", "void"];
 const vectorTypes = concat(scalarTypes.map(t => [1, 2, 3, 4].map(n => `${t}${n}`)));
 const matrixTypes = concat(scalarTypes.map(t => [1, 2, 3, 4].map(n => `${t}${n}x${n}`)));
 const samplerTypes = concat(["sampler"].map(t => ["1D", "2D", "3D", "CUBE", "RECT"].map(d => `${t}${d}`)));
@@ -30,30 +30,65 @@ const cgBuildInKeywordsCompletion: CompletionItem[]
             kind: CompletionItemKind.Keyword
         }
     });
-
 class CgType
 {
     name: string;
     members: CgVariable[] = [];
-    context: cgGlobalContext;
-    constructor(name: string, context: cgGlobalContext, members: CgVariable[] = [])
+    context: CgGlobalContext;
+    constructor(name: string, context: CgGlobalContext, members: CgVariable[] = [])
     {
         this.name = name;
         this.context = context;
         this.members = members;
     }
 }
-class CgVariable
+class CgFunction
 {
     type: CgType;
     name: string;
-    semantics: string;
-    context: CgContext;
-    constructor(type: CgType, name: string, semantics: string = "")
+    semantics: string = null;
+    parameters: CgVariable[] = [];
+    globalContext: CgGlobalContext;
+    functionContext: CgContext;
+    constructor(type: CgType, name: string, semantics: string = null, params: CgVariable[] = [])
     {
         this.type = type;
         this.name = name;
         this.semantics = semantics;
+        this.parameters = params;
+    }
+    addParameter(param: CgVariable)
+    {
+        this.parameters.push(param);
+        if (this.functionContext)
+            this.functionContext.addVariable(param);
+    }
+    setFunctionContext(context: CgContext)
+    {
+        this.functionContext = context;
+        this.globalContext.addContext(context);
+        this.parameters.forEach(param => context.addVariable(param));
+    }
+    toString()
+    {
+        return `${this.type.name} ${this.name}(${this.parameters.map(param => param.toString()).join(", ")})${this.semantics ? ` :${this.semantics}` : ""}`;
+    }
+}
+class CgVariable
+{
+    type: CgType;
+    name: string;
+    semantics: string = null;
+    context: CgContext;
+    constructor(type: CgType, name: string, semantics: string = null)
+    {
+        this.type = type;
+        this.name = name;
+        this.semantics = semantics;
+    }
+    toString()
+    {
+        return `${this.type.name} ${this.name}${this.semantics ? ` :${this.semantics}` : ""}`;
     }
 }
 class CgContext
@@ -61,7 +96,7 @@ class CgContext
     upper: CgContext;
     contexts: CgContext[] = [];
     variables: CgVariable[] = [];
-    global: cgGlobalContext;
+    global: CgGlobalContext;
 
     addContext(context: CgContext)
     {
@@ -86,7 +121,7 @@ class CgContext
     getType(name: string): CgType
     {
         let t = linq.from(this.global.declaredTypes).where(t => t.name === name).firstOrDefault();
-        return t ? t : new CgType("?", this.global);
+        return t ? t : new CgType(`${name}?`, this.global);
     }
     protected internalGetAllVariables(): Map<string, CgVariable>
     {
@@ -109,9 +144,17 @@ class CgContext
         return varList;
     }
 }
-class cgGlobalContext extends CgContext
+class CgGlobalContext extends CgContext
 {
     declaredTypes: CgType[] = [];
+    functions: CgFunction[] = [];
+    constructor()
+    {
+        super();
+        this.global = this;
+        this.upper = null;
+        this.declaredTypes = cgBuildInTypes.map(t => new CgType(t, this));
+    }
     addContext(context: CgContext)
     {
         super.addContext(context);
@@ -122,12 +165,10 @@ class cgGlobalContext extends CgContext
         this.declaredTypes.push(type);
         type.context = this;
     }
-    constructor()
+    addFunction(func: CgFunction)
     {
-        super();
-        this.global = this;
-        this.upper = null;
-        this.declaredTypes = cgBuildInTypes.map(t => new CgType(t, this));
+        this.functions.push(func);
+        func.globalContext = this;
     }
 }
 
@@ -138,9 +179,33 @@ function toCgVariableCompletions(varList: CgVariable[]): CompletionItem[]
         return {
             label: v.name,
             kind: CompletionItemKind.Variable,
-            detail: `${v.type.name} ${v.name}${v.semantics === "" ? "" : ` :${v.semantics}`}`
+            detail: v.toString()
         }
     });
 }
 
-export { cgBuildInTypes, cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgType, CgVariable, CgContext, cgGlobalContext,toCgVariableCompletions };
+function toCgFunctionCompletions(funcList: CgFunction[]): CompletionItem[]
+{
+    return funcList.map(func =>
+    {
+        return {
+            label: func.name,
+            kind: CompletionItemKind.Function,
+            detail: func.toString()
+        }
+    });
+}
+
+export
+{
+    cgBuildInTypes,
+    cgBuildInTypesCompletion,
+    cgBuildInKeywordsCompletion,
+    CgType,
+    CgVariable,
+    CgContext,
+    CgGlobalContext,
+    toCgVariableCompletions,
+    CgFunction,
+    toCgFunctionCompletions
+};

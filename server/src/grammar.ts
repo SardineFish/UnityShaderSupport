@@ -437,6 +437,7 @@ class MatchResult
     endOffset: number;
     matched: boolean = true;
     scope: GrammarScope;
+    state: any = null;
     parent: MatchResult = null;
     children: MatchResult[] = [];
     matchedScope: ScopeMatchResult;
@@ -536,7 +537,6 @@ class PatternMatchResult extends MatchResult
 }
 class ScopeMatchResult extends MatchResult
 {
-    state: any = null;
     beginMatch: MatchResult;
     endMatch: MatchResult;
     constructor(doc: TextDocument, scope: ScopePattern)
@@ -762,6 +762,7 @@ class GrammarPattern
     dictionary?: PatternDictionary;
     keepSpace?: boolean = false;
     name?: string;
+    id?: string;
     crossLine?: boolean = false;
     scopes?: ScopeDictionary;
     recursive?: boolean = false;
@@ -963,7 +964,7 @@ function compilePattern(pattern: GrammarPattern): PatternItem
     {
         if (patternList.subPatterns[0] == patternList)
             throw new Error("Looped.");
-        if (!(pattern.onMatched || pattern.onCompletion || pattern.onDiagnostic))
+        if (!(pattern.id || pattern.onMatched || pattern.onCompletion || pattern.onDiagnostic))
         {
             patternList.subPatterns[0].ignorable = true;
             pattern._compiledPattern = patternList.subPatterns[0];
@@ -1015,4 +1016,16 @@ function namedPattern(patternName: string): GrammarPattern
 {
     return { patterns: [`<${patternName}>`] };
 }
-export { LanguageGrammar, GrammarPattern, compileGrammar, matchGrammar, GrammarScope, includePattern, namedPattern };
+export
+{
+    LanguageGrammar,
+    GrammarPattern,
+    compileGrammar,
+    matchGrammar,
+    GrammarScope,
+    includePattern,
+    namedPattern,
+    MatchResult,
+    PatternMatchResult,
+    ScopeMatchResult
+};

@@ -1,6 +1,7 @@
 import { LanguageGrammar, GrammarPattern, includePattern, namedPattern } from "./grammar";
 import { CompletionItemKind } from "vscode-languageserver";
-import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, cgGlobalContext, CgVariable, toCgVariableCompletions } from "./completion-cg";
+import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, CgGlobalContext, CgVariable, toCgVariableCompletions, toCgFunctionCompletions } from "./grammar-cg";
+import { onFunctionMatch, onParamsDeclare, onBlockMatch } from "./completion-shaderlab";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -171,7 +172,7 @@ const grammarShaderLab: LanguageGrammar = {
                     ],
                     onMatched: (match) =>
                     {
-                        match.state = new cgGlobalContext();
+                        match.state = new CgGlobalContext();
                     }
                 }
             }
@@ -184,10 +185,7 @@ const grammarShaderLab: LanguageGrammar = {
                 "name": GrammarPattern.Identifier,
                 "semantics": GrammarPattern.Identifier
             },
-            onMatched: (match) =>
-            {
-                //console.log(match.text);
-            },
+            onMatched: onFunctionMatch,
             onCompletion: (match) =>
             {
                 if (match.patternName === "type")
@@ -208,7 +206,8 @@ const grammarShaderLab: LanguageGrammar = {
                     patterns: ["in ", "out ", "inout "],
                     keepSpace: true
                 }
-            }
+            },
+            onMatched: onParamsDeclare
         },
         "variableDeclare": {
             name: "Variable Declare",
@@ -292,38 +291,49 @@ const grammarShaderLab: LanguageGrammar = {
                 includePattern("variableDeclare"),
                 {
                     name: "Statement",
+                    id:"statement",
                     patterns: ["<expression>;"]
                 },
                 {
                     name: "If",
+                    id:"if-structure",
                     patterns: ["if (<expression>) {body-block} "]
                 },
                 {
                     name: "For Loop",
+                    id:"for-structure",
                     patterns: ["for (<expression>;<expression>;<expression>) {body-block}"]
                 },
                 {
                     name: "While Loop",
+                    id:"while-structure",
                     patterns: ["while (<expression>) {body-block}"]
                 },
                 {
                     name: "Do-While Loop",
+                    id:"do-while-structure",
                     patterns: ["do {body-block} while (<expression>);"],
                     crossLine: true
                 },
-                namedPattern("no-sense")
+                {
+                    name: "No sense code",
+                    patterns: ["<no-sense>"],
+                    dictionary: {
+                        "no-sense": {
+                            patterns:["/[_a-zA-Z0-9]+\\s*\\r\\n/"]
+                        }
+                    }
+                }
             ],
-            onMatched: (scope) =>
-            {
-                scope.state = new CgContext();
-                (scope.matchedScope.state as CgContext).addContext(scope.state as CgContext);
-                //console.log(scope.text);
-            },
+            onMatched: onBlockMatch,
             onCompletion: (match) =>
             {
                 let context = match.matchedScope.state as CgContext;
                 if (match.patternName === "no-sense")
-                    return cgBuildInKeywordsCompletion.concat(cgBuildInTypesCompletion).concat(toCgVariableCompletions(context.getAllVariables()));
+                    return cgBuildInKeywordsCompletion
+                        .concat(cgBuildInTypesCompletion)
+                        .concat(toCgVariableCompletions(context.getAllVariables()))
+                        .concat(toCgFunctionCompletions(context.global.functions));
                 return [];
             }
         }
