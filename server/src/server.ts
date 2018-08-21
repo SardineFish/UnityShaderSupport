@@ -9,6 +9,8 @@ const connection = createConnection(ProposedFeatures.all);
 
 const documents: TextDocuments = new TextDocuments();
 
+const compiledGrammarShaderLab = compileGrammar(grammarShaderLab);
+
 let documentList = new Map<string, TextDocument>();
 
 connection.onInitialize((params: InitializeParams) =>
@@ -44,14 +46,12 @@ connection.onCompletion((docPos: CompletionParams): CompletionItem[] =>
 {
     try
     {
-        let doc = getDocument(docPos.textDocument.uri);
-        let grammarDeclare = grammarShaderLab;
-        let grammar = compileGrammar(grammarDeclare);
-        //console.log(grammar.toString());
-        connection.console.log(new Date().getTime().toString());
-        let match = matchGrammar(grammar, doc);
-        connection.console.log(new Date().getTime().toString());
-        return match.requestCompletion(docPos.position);
+        let startTime = new Date().getTime();
+        let match = matchGrammar(compiledGrammarShaderLab, getDocument(docPos.textDocument.uri));
+        let completions = match.requestCompletion(docPos.position);
+        let endTime = new Date().getTime();
+        console.log(`Complete in ${endTime - startTime}ms. `);
+        return completions;
     }
     catch (ex)
     {

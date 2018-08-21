@@ -603,6 +603,18 @@ class GrammarMatchResult extends ScopeMatchResult
                 completions = completions.concat(comps);
             }
         }
+        // Remove same 
+        completions = linq.from(completions).orderBy(item => item.label).toArray();
+        let selectedCompletions: CompletionItem[] = [];
+        for (let i = 0; i < completions.length; i++)
+        {
+            if (!completions[i])
+                continue;
+            else if (selectedCompletions.length === 0)
+                selectedCompletions.push(completions[i]);
+            if (completions[i].label != selectedCompletions[selectedCompletions.length - 1].label)
+                selectedCompletions.push(completions[i]);
+        }
         return completions;
     }
 }
@@ -999,4 +1011,8 @@ function includePattern(patternName: string): GrammarPattern
 {
     return { patterns: [`<${patternName}>`] };
 }
-export { LanguageGrammar, GrammarPattern, compileGrammar, matchGrammar, GrammarScope, includePattern };
+function namedPattern(patternName: string): GrammarPattern
+{
+    return { patterns: [`<${patternName}>`] };
+}
+export { LanguageGrammar, GrammarPattern, compileGrammar, matchGrammar, GrammarScope, includePattern, namedPattern };

@@ -1,5 +1,6 @@
-import { LanguageGrammar, GrammarPattern, includePattern } from "./grammar";
+import { LanguageGrammar, GrammarPattern, includePattern, namedPattern } from "./grammar";
 import { CompletionItemKind } from "vscode-languageserver";
+import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion } from "./completion-cg";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -185,6 +186,10 @@ const grammarShaderLab: LanguageGrammar = {
             },
             onCompletion: (match) =>
             {
+                if (match.patternName === "type")
+                {
+                    return cgBuildInTypesCompletion;
+                }
                 return [];
             }
         },
@@ -217,13 +222,9 @@ const grammarShaderLab: LanguageGrammar = {
             {
                 if (match.patternName === "type")
                 {
-                    return [
-                        {
-                            label: "float",
-                            kind:CompletionItemKind.Keyword
-                        }
-                    ]
+                    return cgBuildInTypesCompletion;
                 }
+                return [];
             }
         },
         "expression": {
@@ -301,7 +302,8 @@ const grammarShaderLab: LanguageGrammar = {
                     name: "Do-While Loop",
                     patterns: ["do {body-block} while (<expression>);"],
                     crossLine: true
-                }
+                },
+                namedPattern("no-sense")
             ],
             onMatched: (scope) =>
             {
@@ -309,6 +311,8 @@ const grammarShaderLab: LanguageGrammar = {
             },
             onCompletion: (match) =>
             {
+                if (match.patternName === "no-sense")
+                    return cgBuildInKeywordsCompletion.concat(cgBuildInTypesCompletion);
                 return [];
             }
         }
