@@ -1,4 +1,5 @@
 import { LanguageGrammar, GrammarPattern, includePattern } from "./grammar";
+import { CompletionItemKind } from "vscode-languageserver";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -180,7 +181,11 @@ const grammarShaderLab: LanguageGrammar = {
             },
             onMatched: (match) =>
             {
-                console.log(match.text);
+                //console.log(match.text);
+            },
+            onCompletion: (match) =>
+            {
+                return [];
             }
         },
         "paramsDeclare": {
@@ -206,7 +211,19 @@ const grammarShaderLab: LanguageGrammar = {
             },
             onMatched: (match) =>
             {
-                console.log(match.text);
+                //console.log(match.text);
+            },
+            onCompletion: (match) =>
+            {
+                if (match.patternName === "type")
+                {
+                    return [
+                        {
+                            label: "float",
+                            kind:CompletionItemKind.Keyword
+                        }
+                    ]
+                }
             }
         },
         "expression": {
@@ -243,6 +260,10 @@ const grammarShaderLab: LanguageGrammar = {
                     patterns: ["/(((\\+|-|\\*|\\/|%|=|&|\\||\\^|<<|>>)=?)|(<|>|<=|>=|==|\\!=|\\|\\||&&)|(\\.|\\?|\\:|~))/"]
                 }
             },
+            onCompletion: (match) =>
+            {
+                return [];
+            }
         },
         "bracket": {
             name: "Bracket",
@@ -284,7 +305,11 @@ const grammarShaderLab: LanguageGrammar = {
             ],
             onMatched: (scope) =>
             {
-                console.log(scope.text);
+                //console.log(scope.text);
+            },
+            onCompletion: (match) =>
+            {
+                return [];
             }
         }
     }

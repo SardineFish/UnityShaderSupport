@@ -42,14 +42,21 @@ function getDocument(uri: string)
 
 connection.onCompletion((docPos: CompletionParams): CompletionItem[] =>
 {
-    let doc = getDocument(docPos.textDocument.uri);
-    let grammarDeclare = grammarShaderLab;
-    let grammar = compileGrammar(grammarDeclare);
-    //console.log(grammar.toString());
-    connection.console.log(new Date().getTime().toString());
-    let match = matchGrammar(grammar, doc);
-    connection.console.log(new Date().getTime().toString());
-    return match.requestCompletion(docPos.position);
+    try
+    {
+        let doc = getDocument(docPos.textDocument.uri);
+        let grammarDeclare = grammarShaderLab;
+        let grammar = compileGrammar(grammarDeclare);
+        //console.log(grammar.toString());
+        connection.console.log(new Date().getTime().toString());
+        let match = matchGrammar(grammar, doc);
+        connection.console.log(new Date().getTime().toString());
+        return match.requestCompletion(docPos.position);
+    }
+    catch (ex)
+    {
+        console.error(ex);
+    }
 });
 
 documents.listen(connection);

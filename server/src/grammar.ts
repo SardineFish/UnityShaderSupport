@@ -2,7 +2,7 @@ import { TextDocument, Position, TextDocumentItem, LogMessageNotification, Compl
 import linq from "linq";
 //import sourceShaderLab from "./shaderlab.grammar";
 
-type DocumentCompletionCallback = (pos: Position) => CompletionItem[];
+type DocumentCompletionCallback = (match:MatchResult) => CompletionItem[];
 type PatternMatchedCallback = (patternMatch: PatternMatchResult) => void;
 type ScopeMatchedCallback = (scopeMatch: ScopeMatchResult) => void;
 type DocumentDiagnoseCallback = (unMatched: UnMatchedText) => Diagnostic[];
@@ -153,6 +153,7 @@ class IdentifierPattern extends RegExpPattern
     }
 }
 
+
 class OrderedPatternSet extends PatternItem
 {
     name = "nest";
@@ -181,12 +182,12 @@ class OrderedPatternSet extends PatternItem
                 {
                     if (this.subPatterns[i].ignorable)
                         continue;
-                    match.children.push(subMatch);
+                    match.addChildren(subMatch);
                     match.endOffset = subMatch.endOffset;
                     match.matched = false;
                     return match;
                 }
-                match.children.push(subMatch);
+                match.addChildren(subMatch);
                 startOffset = subMatch.endOffset;
                 if (this.subPatterns[i].multi)
                     i--;
@@ -210,6 +211,10 @@ class OrderedPatternSet extends PatternItem
         return match;
     }
 }
+
+/**
+ * Set of PatternItem created by compiled GrammarPattern
+ */
 class OptionalPatternSet extends OrderedPatternSet
 {
     name = "optional";
@@ -218,18 +223,26 @@ class OptionalPatternSet extends OrderedPatternSet
     {
         let match = new PatternMatchResult(doc, this);
         match.startOffset = startOffset;
+        let failedMatches: MatchResult[] = [];
         for (let i = 0; i < this.subPatterns.length; i++)
         {
             let subMatch = this.subPatterns[i].match(doc, startOffset);
             if (!subMatch.matched)
+            {
+                failedMatches.push(subMatch);
                 continue;
-            match.children.push(subMatch);
+            }
+            match.addChildren(subMatch);
             break;
         }
         if (match.children.length === 0)
         {
             match.endOffset = match.startOffset + 1;
             match.matched = false;
+            let unMatched = new UnMatchedPattern(doc, this, failedMatches);
+            unMatched.startOffset = startOffset;
+            unMatched.endOffset = linq.from(failedMatches).max(match => match.endOffset);
+            return unMatched;
         }
         else
         {
@@ -294,7 +307,7 @@ class ScopePattern extends OrderedPatternSet
                         match.endMatch = subMatch;
                         break;
                     }
-                    match.children.push(subMatch);
+                    match.addChildren(subMatch);
                     match.endOffset = startOffset = subMatch.endOffset;
                     hasMatched = true;
 
@@ -307,7 +320,7 @@ class ScopePattern extends OrderedPatternSet
                     let unMatched = new UnMatchedText(doc, this.scope, failedMatches);
                     failedMatches = [];
                     unMatched.startOffset = startOffset;
-                    match.children.push(unMatched);
+                    match.addChildren(unMatched);
 
                     let pos = doc.positionAt(startOffset);
                     pos.line++;
@@ -380,7 +393,7 @@ class Grammar extends ScopePattern
                 }
                 failedMathes = [];
                 hasMatched = true;
-                match.children.push(subMatch);
+                match.addChildren(subMatch);
                 match.endOffset = startOffset = subMatch.endOffset;
                 cleanSpace();
                 break;
@@ -391,7 +404,7 @@ class Grammar extends ScopePattern
                 let unMatched = new UnMatchedText(doc, this.scope, failedMathes);
                 failedMathes = [];
                 unMatched.startOffset = startOffset;
-                match.children.push(unMatched);
+                match.addChildren(unMatched);
 
                 let pos = doc.positionAt(startOffset);
                 pos.line++;
@@ -419,13 +432,16 @@ class MatchResult
 {
     document: TextDocument;
     patternItem: PatternItem;
-    patternName: string;
+    patternName: string = null;
     startOffset: number;
     endOffset: number;
     matched: boolean = true;
     scope: GrammarScope;
+    parent: MatchResult = null;
     children: MatchResult[] = [];
     matchedScope: ScopeMatchResult;
+    matchedPattern: PatternMatchResult;
+    _unmatchedPattern: UnMatchedPattern;
     private _pattern: GrammarPattern = null;
     get start() { return this.document.positionAt(this.startOffset); }
     get end() { return this.document.positionAt(this.endOffset); }
@@ -442,12 +458,17 @@ class MatchResult
     {
         return this.text;
     }
+    addChildren(match :MatchResult)
+    {
+        match.parent = this;
+        this.children.push(match);
+    }
     locateMatchAtPosition(pos: Position): MatchResult
     {
         if (this.children.length <= 0)
             return this;
         let offset = this.document.offsetAt(pos);
-        let child = linq.from(this.children).where(child => child.startOffset <= offset && offset < child.endOffset).firstOrDefault();
+        let child = linq.from(this.children).where(child => child.startOffset <= offset && offset <= child.endOffset).firstOrDefault();
         if (!child)
             return this;
         return child.locateMatchAtPosition(pos);
@@ -459,6 +480,8 @@ class PatternMatchResult extends MatchResult
     private _matchesList: MatchResult[] = null;
     private get allMathches(): MatchResult[]
     {
+        if (this.children.length <= 0)
+            return [];
         if (!this._matchesList)
         {
             let list = [this.children[0]];
@@ -466,7 +489,10 @@ class PatternMatchResult extends MatchResult
             {
                 if (list[i] instanceof PatternMatchResult || list[i] instanceof ScopeMatchResult || list[i] instanceof UnMatchedText)
                     continue;
+                if (!list[i])
+                    console.log(list[i]);
                 list = list.concat(list[i].children);
+                
             }
             this._matchesList = list;
         }
@@ -489,7 +515,10 @@ class PatternMatchResult extends MatchResult
         this.allMathches.forEach(match =>
         {
             if (match != this)
+            {
                 match.matchedScope = this.matchedScope;
+                match.matchedPattern = this;
+            }
             if (match instanceof ScopeMatchResult)
             {
                 match.processSubMatches();
@@ -500,7 +529,7 @@ class PatternMatchResult extends MatchResult
             }
             else if (match instanceof UnMatchedText)
             {
-                match.process();
+                match.processSubMatches();
             }
         });
     }
@@ -527,6 +556,7 @@ class ScopeMatchResult extends MatchResult
             if (i > 0)
             {
                 subMatch.matchedScope = this;
+                subMatch.matchedPattern = this.matchedPattern;
                 if (subMatch instanceof ScopeMatchResult)
                 {
                     subMatch.processSubMatches();
@@ -539,7 +569,7 @@ class ScopeMatchResult extends MatchResult
                 }
                 else if (subMatch instanceof UnMatchedText)
                 {
-                    subMatch.process();
+                    subMatch.processSubMatches();
                     continue;
                 }
             }
@@ -552,23 +582,140 @@ class GrammarMatchResult extends ScopeMatchResult
 {
     requestCompletion(pos: Position): CompletionItem[]
     {
+        let completions: CompletionItem[] = [];
         let match = this.locateMatchAtPosition(pos);
-        return [];
+        if (match instanceof UnMatchedText)
+        {
+            completions = completions.concat(match.requestCompletion(pos));
+        }
+        for (let matchP = match; matchP != null; matchP = matchP.parent)
+        {
+            if (!matchP.patternName)
+                continue;
+            if (matchP.matchedPattern && matchP.matchedPattern.pattern.onCompletion)
+            {
+                let comps = matchP.matchedPattern.pattern.onCompletion(matchP);
+                completions = completions.concat(comps);
+            }
+            if (matchP.matchedScope && matchP.matchedScope.scope.onCompletion)
+            {
+                let comps = matchP.matchedScope.scope.onCompletion(matchP);
+                completions = completions.concat(comps);
+            }
+        }
+        return completions;
     }
 }
 class UnMatchedText extends MatchResult
 {
     allMatches: MatchResult[];
     matched = false;
+    protected _matchesList: MatchResult[] = null;
+    protected get allSubMatches(): MatchResult[]
+    {
+        if (this.allMatches.length <= 0)
+            return [];
+        if (!this._matchesList)
+        {
+            let list = this.allMatches;
+            for (let i = 0; i < list.length; i++)
+            {
+                if (list[i] instanceof PatternMatchResult || list[i] instanceof ScopeMatchResult || list[i] instanceof UnMatchedText)
+                    continue;
+                list = list.concat(list[i].children);
+            }
+            this._matchesList = list;
+        }
+        return this._matchesList;
+    }
     constructor(doc: TextDocument, scope: GrammarScope, matches: MatchResult[])
     {
         super(doc, null);
         this.scope = scope;
         this.allMatches = matches;
     }
-    process()
+    processSubMatches()
     {
-        console.log(this.text);
+        this.allMatches.forEach(match => match.parent = this);
+        this.allSubMatches.forEach(match =>
+        {
+            match.matchedPattern = this.matchedPattern;
+            match.matchedScope = this.matchedScope;
+            if (match instanceof PatternMatchResult || match instanceof ScopeMatchResult || match instanceof UnMatchedText)
+            {
+                match.processSubMatches();
+            }
+        });
+        //console.log(this.text);
+    }
+    locateAllMatchesAtPosition(pos: Position): MatchResult[]
+    {
+        return this.children.map(match => match.locateMatchAtPosition(pos));
+    }
+    requestCompletion(pos: Position): CompletionItem[]
+    {
+        let completions: CompletionItem[] = [];
+        this.allMatches.forEach(match =>
+        {
+            let endMatch = match.locateMatchAtPosition(pos);
+            if (endMatch instanceof UnMatchedText)
+            {
+                completions = completions.concat(endMatch.requestCompletion(pos));
+            }
+            for (let matchP = endMatch; matchP != this; matchP = matchP.parent)
+            {
+                if (!matchP.patternName)
+                    continue;
+                if (matchP._unmatchedPattern && matchP._unmatchedPattern.pattern.onCompletion)
+                {
+                    let comps = matchP._unmatchedPattern.pattern.onCompletion(matchP);
+                    completions = completions.concat(comps);
+                }
+                else
+                {
+                    if (matchP.matchedPattern && matchP.matchedPattern.pattern.onCompletion)
+                    {
+                        let comps = matchP.matchedPattern.pattern.onCompletion(matchP);
+                        completions = completions.concat(comps);
+                    }
+                    if (matchP.matchedScope && matchP.matchedScope.scope.onCompletion)
+                    {
+                        let comps = matchP.matchedScope.scope.onCompletion(matchP);
+                        completions = completions.concat(comps);
+                    }
+                }
+
+            }
+        });
+        return completions;
+    }
+    addChildren(match: MatchResult)
+    {
+        match.parent = this;
+        this.allMatches.push(match);
+    }
+}
+class UnMatchedPattern extends UnMatchedText
+{
+    constructor(doc: TextDocument, patternItem: PatternItem, matches: MatchResult[])
+    {
+        super(doc, patternItem.pattern._scope, matches);
+        this.patternItem = patternItem;
+    }
+    processSubMatches()
+    {
+        this.allMatches.forEach(match => match.parent = this);
+        this.allSubMatches.forEach(match =>
+        {
+            match._unmatchedPattern = this;
+            match.matchedPattern = this.matchedPattern;
+            match.matchedScope = this.matchedScope;
+            if (match instanceof PatternMatchResult || match instanceof ScopeMatchResult || match instanceof UnMatchedText)
+            {
+                match.processSubMatches();
+            }
+        });
+        //console.log(this.text);
     }
 }
 class PatternDictionary
@@ -609,6 +756,7 @@ class GrammarPattern
 
     onMatched?: PatternMatchedCallback;
     onDiagnostic?: DocumentDiagnoseCallback;
+    onCompletion?: DocumentCompletionCallback;
     _parent?: GrammarPattern;
     _nameInParent?: string;
     _scope?: GrammarScope;
@@ -803,7 +951,7 @@ function compilePattern(pattern: GrammarPattern): PatternItem
     {
         if (patternList.subPatterns[0] == patternList)
             throw new Error("Looped.");
-        if (!pattern.onMatched)
+        if (!(pattern.onMatched || pattern.onCompletion || pattern.onDiagnostic))
         {
             patternList.subPatterns[0].ignorable = true;
             pattern._compiledPattern = patternList.subPatterns[0];

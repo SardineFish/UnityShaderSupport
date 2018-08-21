@@ -16,7 +16,8 @@
             "sourceMaps": true,
             "outFiles": [
                 "${workspaceRoot}/server/out/**/*.js"
-            ]
+            ],
+            "timeout": 2000
         },
         {
             "type": "extensionHost",
