@@ -1,6 +1,6 @@
 import { LanguageGrammar, GrammarPattern, includePattern, namedPattern } from "./grammar";
 import { CompletionItemKind } from "vscode-languageserver";
-import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion } from "./completion-cg";
+import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, cgGlobalContext, CgVariable, toCgVariableCompletions } from "./completion-cg";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -168,7 +168,11 @@ const grammarShaderLab: LanguageGrammar = {
                         },
                         includePattern("variableDeclare"),
                         includePattern("functionDefinition")
-                    ]
+                    ],
+                    onMatched: (match) =>
+                    {
+                        match.state = new cgGlobalContext();
+                    }
                 }
             }
         },
@@ -216,7 +220,11 @@ const grammarShaderLab: LanguageGrammar = {
             },
             onMatched: (match) =>
             {
-                //console.log(match.text);
+                let type = match.getMatch("type")[0].text;
+                let name = match.getMatch("name")[0].text;
+                let semantics = match.getMatch("semantics")[0] ? match.getMatch("semantics")[0].text : "";
+                let context = match.matchedScope.state as CgContext;
+                context.addVariable(new CgVariable(context.getType(type), name, semantics));
             },
             onCompletion: (match) =>
             {
@@ -307,12 +315,15 @@ const grammarShaderLab: LanguageGrammar = {
             ],
             onMatched: (scope) =>
             {
+                scope.state = new CgContext();
+                (scope.matchedScope.state as CgContext).addContext(scope.state as CgContext);
                 //console.log(scope.text);
             },
             onCompletion: (match) =>
             {
+                let context = match.matchedScope.state as CgContext;
                 if (match.patternName === "no-sense")
-                    return cgBuildInKeywordsCompletion.concat(cgBuildInTypesCompletion);
+                    return cgBuildInKeywordsCompletion.concat(cgBuildInTypesCompletion).concat(toCgVariableCompletions(context.getAllVariables()));
                 return [];
             }
         }
