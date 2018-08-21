@@ -12,6 +12,7 @@ abstract class PatternItem
 {
     name: string = "pattern";
     parent?: OrderedPatternSet;
+    strict: boolean = false;
     ignorable: boolean = false;
     multi: boolean = false;
     pattern: GrammarPattern;
@@ -62,6 +63,14 @@ class EmptyPattern extends PatternItem
         if (match.index > 0)
             return null;
         return match;
+    }
+    static isEmpty(text: string,crossLine:boolean = false)
+    {
+        const reg = crossLine ?
+            /^(((?:\s|\/\*(?!\/).*?\*\/)*)(\/\/.*[\r]?[\n]?)?)*$/
+            :
+            /^((?:[ \t]|\/\*(?!\/).*?\*\/)*)?$/;
+        return reg.test(text);
     }
     match(doc: TextDocument, startOffset: number): MatchResult
     {
@@ -180,6 +189,13 @@ class OrderedPatternSet extends PatternItem
                 let subMatch = this.subPatterns[i].match(doc, startOffset);
                 if (!subMatch.matched)
                 {
+                    if (this.strict && !EmptyPattern.isEmpty(subMatch.text))
+                    {
+                        match.addChildren(subMatch);
+                        match.endOffset = subMatch.endOffset;
+                        match.matched = false;
+                        return match;
+                    }
                     if (this.subPatterns[i].ignorable)
                         continue;
                     match.addChildren(subMatch);
@@ -466,9 +482,11 @@ class MatchResult
     }
     locateMatchAtPosition(pos: Position): MatchResult
     {
+        let offset = this.document.offsetAt(pos);
+        if (offset < this.startOffset || this.endOffset < offset)
+            return null;
         if (this.children.length <= 0)
             return this;
-        let offset = this.document.offsetAt(pos);
         let child = linq.from(this.children).where(child => child.startOffset <= offset && offset <= child.endOffset).firstOrDefault();
         if (!child)
             return this;
@@ -584,6 +602,8 @@ class GrammarMatchResult extends ScopeMatchResult
     {
         let completions: CompletionItem[] = [];
         let match = this.locateMatchAtPosition(pos);
+        if (!match)
+            return [];
         if (match instanceof UnMatchedText)
         {
             completions = completions.concat(match.requestCompletion(pos));
@@ -660,16 +680,14 @@ class UnMatchedText extends MatchResult
         });
         //console.log(this.text);
     }
-    locateAllMatchesAtPosition(pos: Position): MatchResult[]
-    {
-        return this.children.map(match => match.locateMatchAtPosition(pos));
-    }
     requestCompletion(pos: Position): CompletionItem[]
     {
         let completions: CompletionItem[] = [];
         this.allMatches.forEach(match =>
         {
             let endMatch = match.locateMatchAtPosition(pos);
+            if (!endMatch)
+                return;
             if (endMatch instanceof UnMatchedText)
             {
                 completions = completions.concat(endMatch.requestCompletion(pos));
@@ -763,6 +781,7 @@ class GrammarPattern
     keepSpace?: boolean = false;
     name?: string;
     id?: string;
+    strict?: boolean = false;
     crossLine?: boolean = false;
     scopes?: ScopeDictionary;
     recursive?: boolean = false;
@@ -955,6 +974,7 @@ function compilePattern(pattern: GrammarPattern): PatternItem
     pattern.patterns.forEach(pt =>
     {
         let subPattern = analysePatternItem(pt, pattern);
+        subPattern.strict = pattern.strict ? true : false;
         subPattern.ignorable = true;
         patternList.addSubPattern(subPattern);
     });

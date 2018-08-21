@@ -41,6 +41,11 @@ class CgType
         this.context = context;
         this.members = members;
     }
+    addMember(v: CgVariable)
+    {
+        v.context = null;
+        this.members.push(v);
+    }
 }
 class CgFunction
 {
@@ -196,6 +201,17 @@ function toCgFunctionCompletions(funcList: CgFunction[]): CompletionItem[]
     });
 }
 
+function toCgFieldCompletions(fields: CgVariable[]): CompletionItem[]
+{
+    return fields.map(field =>
+    {
+        return {
+            label: field.name,
+            kind: CompletionItemKind.Field,
+            detail: field.toString()
+        }
+    });
+}
 export
 {
     cgBuildInTypes,
@@ -207,5 +223,6 @@ export
     CgGlobalContext,
     toCgVariableCompletions,
     CgFunction,
-    toCgFunctionCompletions
+    toCgFunctionCompletions,
+    toCgFieldCompletions
 };

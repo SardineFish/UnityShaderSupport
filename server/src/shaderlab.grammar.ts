@@ -1,7 +1,7 @@
 import { LanguageGrammar, GrammarPattern, includePattern, namedPattern } from "./grammar";
 import { CompletionItemKind } from "vscode-languageserver";
 import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, CgGlobalContext, CgVariable, toCgVariableCompletions, toCgFunctionCompletions } from "./grammar-cg";
-import { onFunctionMatch, onParamsDeclare, onBlockMatch } from "./completion-shaderlab";
+import { onFunctionMatch, onParamsDeclare, onBlockMatch, onStructDeclare, onStructMemberDeclare, onExpressionComplete } from "./completion-shaderlab";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -168,7 +168,8 @@ const grammarShaderLab: LanguageGrammar = {
                             }
                         },
                         includePattern("variableDeclare"),
-                        includePattern("functionDefinition")
+                        includePattern("functionDefinition"),
+                        includePattern("structDeclare")
                     ],
                     onMatched: (match) =>
                     {
@@ -209,6 +210,23 @@ const grammarShaderLab: LanguageGrammar = {
             },
             onMatched: onParamsDeclare
         },
+        "structDeclare": {
+            name: "Struct",
+            patterns: ["struct <name>{struct-body};"],
+            scopes: {
+                "struct-body": {
+                    begin: "{",
+                    end: "}",
+                    patterns: [{
+                        name: "Member Declare",
+                        id:"member-declare",
+                        patterns: ["<type> < > <name> [:<semantics>];"],
+                        onMatched: onStructMemberDeclare
+                    }]
+                }
+            },
+            onMatched:onStructDeclare
+        },
         "variableDeclare": {
             name: "Variable Declare",
             patterns: ["<type> < > <name> [:<semantics>] [= <expression>];"],
@@ -239,6 +257,7 @@ const grammarShaderLab: LanguageGrammar = {
             patterns: [
                 "<expr-unit> [<operator> <expr-unit> ...]"
             ],
+            strict: true,
             dictionary: {
                 "expr-unit": {
                     name: "Expression Unit with Operator",
@@ -268,10 +287,7 @@ const grammarShaderLab: LanguageGrammar = {
                     patterns: ["/(((\\+|-|\\*|\\/|%|=|&|\\||\\^|<<|>>)=?)|(<|>|<=|>=|==|\\!=|\\|\\||&&)|(\\.|\\?|\\:|~))/"]
                 }
             },
-            onCompletion: (match) =>
-            {
-                return [];
-            }
+            onCompletion: onExpressionComplete
         },
         "bracket": {
             name: "Bracket",
