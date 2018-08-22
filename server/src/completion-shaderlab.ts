@@ -250,6 +250,8 @@ function onRenderSetupCompletion(match: MatchResult): CompletionItem[]
     let stateName = getMatchedProps(match._unmatchedPattern, "stateName");
     if (!stateName)
         stateName = getMatchedProps(match.matchedPattern, "stateName");
+    if (match instanceof UnMatchedPattern)
+        stateName = getMatchedProps(match, "stateName");
     let values = renderSetups[stateName];
     if (!stateName || !values)
     {
