@@ -143,7 +143,7 @@ class StringPattern extends RegExpPattern
     {
         super(pattern, /"([^\\"]|\\\S|\\")*"/, ignorable);
     }
-    toString = () => this.ignorable ? "[string]" : "<string>";
+    //toString = () => this.ignorable ? "[string]" : "<string>";
 }
 class NumberPattern extends RegExpPattern
 {
@@ -662,21 +662,6 @@ class GrammarMatchResult extends ScopeMatchResult
             .where(item => item !== undefined)
             .distinct(comp=>comp.label)
             .toArray();
-        return completions;
-        completions = linq.from(completions)
-            .where(item => item !== undefined)
-            .orderBy(item => item.label)
-            .toArray();
-        let selectedCompletions: CompletionItem[] = [];
-        for (let i = 0; i < completions.length; i++)
-        {
-            if (!completions[i])
-                continue;
-            else if (selectedCompletions.length === 0)
-                selectedCompletions.push(completions[i]);
-            if (completions[i].label != selectedCompletions[selectedCompletions.length - 1].label)
-                selectedCompletions.push(completions[i]);
-        }
         return completions;
     }
 }

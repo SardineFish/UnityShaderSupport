@@ -13,6 +13,7 @@
         "Programming Languages"
     ],
     "scripts": {
+        "vscode:prepublish": "cd client && npm run update-vscode && cd .. && npm run build",
         "build:client": "tsc -p ./client/tsconfig.json",
         "build:server": "tsc -p ./server/tsconfig.json",
         "build": "npm run build:client && npm run build:server",
@@ -57,6 +58,7 @@
     "devDependencies": {
         "@types/node": "^10.7.1",
         "tslint": "^5.11.0",
-        "typescript": "^3.0.1"
+        "typescript": "^3.0.1",
+        "vsce": "^1.46.0"
     }
 }
