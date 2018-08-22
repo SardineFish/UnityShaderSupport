@@ -310,17 +310,17 @@ const grammarShaderLab: LanguageGrammar = {
                         },
                         "unary-operator": {
                             name: "Unary Operator",
-                            patterns: ["!", "+", "-", "~"]
+                            patterns: ["!", "+", "-", "~","++","--","*","&","(<type>)","sizeof< >"]
                         },
                         "postfix": {
                             name: "Postfix Operator",
-                            patterns: ["++", "--"]
+                            patterns: ["++", "--","\\[<expression>\\]"]
                         }
                     }
                 },
                 "operator": {
                     name: "Operator",
-                    patterns: ["/(((\\+|-|\\*|\\/|%|=|&|\\||\\^|<<|>>)=?)|(<|>|<=|>=|==|\\!=|\\|\\||&&)|(\\.|\\?|\\:|~))/"]
+                    patterns: ["/(((\\+|-|\\*|\\/|%|=|&|\\||\\^|<<|>>)=?)|(<|>|<=|>=|==|\\!=|\\|\\||&&)|(\\.|\\?|\\:|~|,))/"]
                 }
             },
             onCompletion: onExpressionComplete

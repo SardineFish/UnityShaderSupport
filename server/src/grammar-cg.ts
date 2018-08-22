@@ -39,6 +39,7 @@ class CgType
     name: string;
     members: CgVariable[] = [];
     context: CgGlobalContext;
+    orderedMenber: boolean = false;
     constructor(name: string, context: CgGlobalContext, members: CgVariable[] = [])
     {
         this.name = name;
@@ -50,6 +51,62 @@ class CgType
         v.context = null;
         this.members.push(v);
     }
+    getMember(name: string): CgVariable
+    {
+        return linq.from(this.members)
+            .where(member => member.name === name)
+            .firstOrDefault();
+    }
+}
+class CgArray extends CgType
+{
+    elementTypeName: string;
+    get elementType() { return this.context.getType(this.elementTypeName); }
+    constructor(element: string, context: CgGlobalContext)
+    {
+        super(`${element}[]`, context);
+        this.elementTypeName = element;
+    }
+}
+class CgVector extends CgArray
+{
+    scalarTypeName: string;
+    dimension: number;
+    get scalarType() { return this.context.getType(this.scalarTypeName); }
+    constructor(scalarType: string, dimension: number,context:CgGlobalContext)
+    {
+        super(scalarType, context);
+        this.name = `${scalarType}${dimension}`;
+        this.scalarTypeName = scalarType;
+        this.dimension = dimension;
+        this.orderedMenber = true;
+        let d = [
+            ["x", "y", "z", "w"],
+            ["r", "g", "b", "a"],
+            ["s", "t", "p", "q"],
+        ];
+        for (let i = 0; i < 3; i++)
+        {
+            for (let j = 0; j < dimension; j++)
+            {
+                this.addMember(new CgVariable(this.scalarType, d[i][j]));
+            }
+        }
+    }
+}
+class CgMatrix extends CgArray
+{
+    scalarTypeName: string;
+    row: number;
+    column: number;
+    constructor(scalarType:string, column:number, row:number,context:CgGlobalContext)
+    {
+        super(`${scalarType}${column}`, context);
+        this.column = column;
+        this.row = row;
+        this.name = `${scalarType}${row}x${column}`;
+    }
+
 }
 class CgFunction
 {
@@ -129,6 +186,19 @@ class CgContext
     }
     getType(name: string): CgType
     {
+        const reg = /(float|double|half|int|fixed)([1-4])?(x[1-4])?/;
+        let match = reg.exec(name);
+        if (match)
+        {
+            if (match[3])
+                return new CgMatrix(match[1], parseInt(match[2]), parseInt(match[3]), this.global);
+            else if (match[2])
+                return new CgVector(match[1], parseInt(match[2]), this.global);
+            return new CgType(match[1], this.global);
+        }
+        else if (cgBuildInTypes.indexOf(name) >= 0)
+            return new CgType(name, this.global);
+        
         let t = linq.from(this.global.declaredTypes).where(t => t.name === name).firstOrDefault();
         return t ? t : new CgType(`${name}?`, this.global);
     }
@@ -242,5 +312,6 @@ export
     toCgFieldCompletions,
     toCompletions,
     propertyTypes,
-    preprocessors
+    preprocessors,
+    CgArray
 };

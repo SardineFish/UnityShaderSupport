@@ -1,6 +1,6 @@
 import { CompletionItem, CodeActionKind, CompletionItemKind } from "vscode-languageserver";
 import { MatchResult, PatternMatchResult, ScopeMatchResult, UnMatchedPattern } from "./grammar";
-import { CgFunction, CgContext, CgVariable, CgGlobalContext, CgType, toCgVariableCompletions, toCgFunctionCompletions, toCgFieldCompletions, toCompletions, propertyTypes, cgBuildInTypesCompletion, preprocessors } from "./grammar-cg";
+import { CgFunction, CgContext, CgVariable, CgGlobalContext, CgType, toCgVariableCompletions, toCgFunctionCompletions, toCgFieldCompletions, toCompletions, propertyTypes, cgBuildInTypesCompletion, preprocessors, CgArray } from "./grammar-cg";
 import { Shader, ShaderProperty, SubShader, Pass, Tag, subShaderTags, passTags, getKeys, renderSetups } from "./structure-shaderlb";
 
 function getMatchedProps(match: PatternMatchResult|UnMatchedPattern, name: string, defaultValue: string = null)
@@ -56,6 +56,39 @@ function onStructMemberDeclare(match: PatternMatchResult)
     let member = new CgVariable(struct.context.getType(type), name, semantics);
     struct.addMember(member);
 }
+function getObjectType(match: MatchResult,context:CgContext): CgType
+{
+    const reg = /([_a-zA-Z][_a-zA-Z0-9]*)(\[.*\])?/;
+    let name = "";
+    if (match.children.length === 2)
+    {
+        if (match.children[0].text === ".")
+        {
+            let prevIdx = match.parent.children.indexOf(match) - 1;
+            let prevMatch = match.parent.children[prevIdx];
+            let t = getObjectType(prevMatch, context);
+            let name = match.children[1].text;
+            let result = reg.exec(name);
+            if (result[2])
+            {
+                return (t.getMember(result[1]).type as CgArray).elementType;
+            }
+            return t.getMember(result[1]).type;
+        }
+        name = match.children[1].text;
+    }
+    else
+    {
+        name = match.text;
+    }
+    let result = reg.exec(name);
+    if (result[2])
+    {
+        return (context.getVariable(result[1]).type as CgArray).elementType;
+    }
+    return context.getVariable(result[1]).type;
+
+}
 function onExpressionComplete(match: MatchResult): CompletionItem[]
 {
     let context = match.matchedScope.state as CgContext;
@@ -68,17 +101,34 @@ function onExpressionComplete(match: MatchResult): CompletionItem[]
     {
         if (match.text === ".")
         {
-            let prevIdx = match.parent.parent.children.indexOf(match.parent) - 1;
-            let prevName: string;
-            if (!match.parent.parent.children[prevIdx].children[1])
-                prevName = match.parent.parent.children[prevIdx].text;
-            else 
-                prevName = match.parent.parent.children[prevIdx].children[1].text;
             let context = match.matchedScope.state as CgContext;
-            let variable = context.getVariable(prevName);
-            if (!variable)
-                return [];
-            return toCgFieldCompletions(variable.type.members);
+            let prevIdx = match.parent.parent.children.indexOf(match.parent) - 1;
+            let prevMatch = match.parent.parent.children[prevIdx];
+            let type = getObjectType(prevMatch,context);
+            if (type.orderedMenber)
+            {
+                let base = 1000;
+                return type.members.map((member, idx) =>
+                {
+                    return {
+                        label: member.name,
+                        detail: member.toString(),
+                        sortText: (base+idx).toString(),
+                        kind: CompletionItemKind.Field
+                    }
+                });
+            }
+            else
+            {
+                return type.members.map((member) =>
+                {
+                    return {
+                        label: member.name,
+                        detail: member.toString(),
+                        kind: CompletionItemKind.Field
+                    }
+                });
+            }
         }
     }
     return [];
