@@ -4,6 +4,7 @@
     "description": "Syntax highlight support to Unity shader",
     "version": "1.0.2",
     "publisher": "SardineFish",
+    "license": "MIT",
     "engines": {
         "vscode": "^1.26.0"
     },
@@ -20,6 +21,7 @@
         "watch:server": "tsc -w -p ./server/tsconfig.json",
         "watch": "npm run watch:client && npm run watch:server"
     },
+    "icon": "https://cdn-img.sardinefish.com/NTk3NDAx",
     "main": "./client/out/extension",
     "activationEvents": [
         "onLanguage:shaderlab"
