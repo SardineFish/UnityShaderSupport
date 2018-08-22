@@ -2,7 +2,7 @@
     "name": "unityshader-intellisense",
     "displayName": "UnityShader Support",
     "description": "Language support for Unity Shader",
-    "version": "0.2.3-alpha",
+    "version": "0.2.3-beta",
     "publisher": "SardineFish",
     "license": "MIT",
     "engines": {
