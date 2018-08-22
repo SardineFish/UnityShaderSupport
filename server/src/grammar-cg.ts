@@ -6,6 +6,7 @@ const vectorTypes = concat(scalarTypes.map(t => [1, 2, 3, 4].map(n => `${t}${n}`
 const matrixTypes = concat(scalarTypes.map(t => [1, 2, 3, 4].map(n => `${t}${n}x${n}`)));
 const samplerTypes = concat(["sampler"].map(t => ["1D", "2D", "3D", "CUBE", "RECT"].map(d => `${t}${d}`)));
 const keyWords = ["if", "for", "while", "do"];
+const propertyTypes = ["Range", "Float", "Int", "Color", "Vector", "2D", "Cube", "3D"];
 
 function concat<T>(list: T[][]):T[]
 {
@@ -212,6 +213,16 @@ function toCgFieldCompletions(fields: CgVariable[]): CompletionItem[]
         }
     });
 }
+function toCompletions(labels: string[], kind: CompletionItemKind): CompletionItem[]
+{
+    return labels.map(label =>
+    {
+        return {
+            label: label,
+            kind: kind
+        }
+    });
+}
 export
 {
     cgBuildInTypes,
@@ -224,5 +235,7 @@ export
     toCgVariableCompletions,
     CgFunction,
     toCgFunctionCompletions,
-    toCgFieldCompletions
+    toCgFieldCompletions,
+    toCompletions,
+    propertyTypes
 };

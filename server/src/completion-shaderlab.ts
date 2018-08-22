@@ -1,9 +1,12 @@
 import { CompletionItem, CodeActionKind, CompletionItemKind } from "vscode-languageserver";
-import { MatchResult, PatternMatchResult, ScopeMatchResult } from "./grammar";
-import { CgFunction, CgContext, CgVariable, CgGlobalContext, CgType, toCgVariableCompletions, toCgFunctionCompletions, toCgFieldCompletions } from "./grammar-cg";
+import { MatchResult, PatternMatchResult, ScopeMatchResult, UnMatchedPattern } from "./grammar";
+import { CgFunction, CgContext, CgVariable, CgGlobalContext, CgType, toCgVariableCompletions, toCgFunctionCompletions, toCgFieldCompletions, toCompletions, propertyTypes } from "./grammar-cg";
+import { Shader, ShaderProperty, SubShader, Pass, Tag, subShaderTags, passTags, getKeys, renderSetups } from "./structure-shaderlb";
 
-function getMatchedProps(match: PatternMatchResult, name: string, defaultValue: string = null)
+function getMatchedProps(match: PatternMatchResult|UnMatchedPattern, name: string, defaultValue: string = null)
 {
+    if (!match)
+        return defaultValue;
     let value = match.getMatch(name)[0];
     if (!value)
         return defaultValue;
@@ -80,6 +83,142 @@ function onExpressionComplete(match: MatchResult): CompletionItem[]
     }
     return [];
 }
+
+function onPropertiesCompletion(match: MatchResult):CompletionItem[]
+{
+    if (match.patternName === "propType")
+        return toCompletions(propertyTypes, CompletionItemKind.TypeParameter);
+    else if (match.patternName === "propertyValue")
+    {
+        let typeName = match._unmatchedPattern.getMatch("propType")[0].text;
+        if (/Color|Vector/i.test(typeName))
+            return toCompletions(["(0, 0, 0, 0)"], CompletionItemKind.Snippet);
+        else if (/2D|Cube|3D/i.test(typeName))
+        {
+            return [
+                {
+                    label: '"defaulttexture" {}',
+                    kind: CompletionItemKind.Snippet
+                }
+            ]
+        }
+    }
+    return [];
+}
+function onShaderDeclare(match: ScopeMatchResult)
+{
+    let name = getMatchedProps(match.matchedPattern, "string");
+    let shader = new Shader(name);
+    match.state = shader;
+    match.matchedPattern.state = shader;
+}
+function onPropertiesDeclare(match: PatternMatchResult)
+{
+    let name = getMatchedProps(match, "identifier");
+    let displayName = getMatchedProps(match, "displayName").replace(/"/, "");
+    let type = getMatchedProps(match, "propType");
+    let defaultValue = getMatchedProps(match, "propertyValue");
+    let shader = match.matchedScope.matchedScope.state as Shader;
+    shader.addProperty(new ShaderProperty(name, displayName, type, defaultValue));
+}
+function onSubShaderDeclare(match: ScopeMatchResult)
+{
+    let subShader = new SubShader();
+    match.state = subShader;
+    let shader = match.matchedScope.state as Shader;
+    shader.addSubShader(subShader);
+}
+function  onPassDeclare(match: ScopeMatchResult)
+{
+    let subShader = match.matchedScope.state as SubShader;
+    let pass = new Pass();
+    subShader.addPass(pass);
+    match.state = pass;
+}
+function onTagsMatch(match: PatternMatchResult)
+{
+    let parent = match.matchedScope.matchedScope.state;
+    let tagName = getMatchedProps(match, "tag").replace(/"/g, "");
+    let value = getMatchedProps(match, "value").replace(/"/g, "");
+    if (parent instanceof SubShader || parent instanceof Pass)
+    {
+        parent.addTag(new Tag(tagName, value));
+    }
+}
+function onTagCompletion(match: MatchResult): CompletionItem[]
+{
+    let scope = match.matchedScope.matchedScope.state;
+    let tagName: string;
+    if (!match.patternName)
+    {
+        if (match instanceof UnMatchedPattern && match.getMatch("tag"))
+        {
+            tagName = getMatchedProps(match, "tag").replace(/"/g, "");;
+            scope = match.matchedScope.matchedScope.state;
+        }
+        else
+            scope = match.matchedScope.state;
+    }
+    let tags = scope instanceof SubShader ? subShaderTags :
+        (scope instanceof Pass ? passTags : {});
+    
+    if (tagName || match.patternName === "value")
+    {
+        if (!tagName)
+        {
+            let patternMatch = match._unmatchedPattern || match.matchedPattern;
+            tagName = getMatchedProps(patternMatch, "tag").replace(/"/g, "");
+        }
+        let tagsValues = tags[tagName];
+        if (!tagsValues)
+            return [];
+        return tagsValues.map(value =>
+        {
+            return {
+                label: value,
+                insertText: `"${value}"`,
+                kind: CompletionItemKind.EnumMember
+            };
+        });
+    }
+    else if (!match.patternName || match.patternName === "tag")
+    {
+        return getKeys(tags).map(tagName =>
+        {
+            return {
+                label: tagName,
+                insertText: `"${tagName}"`,
+                kind: CompletionItemKind.Property
+            };
+        });
+    }
+    return [];
+}
+
+function onRenderSetupCompletion(match: MatchResult): CompletionItem[]
+{
+    let stateName = getMatchedProps(match._unmatchedPattern, "stateName");
+    if (!stateName)
+        stateName = getMatchedProps(match.matchedPattern, "stateName");
+    let values = renderSetups[stateName];
+    if (!stateName || !values)
+    {
+        return toCompletions(getKeys(renderSetups), CompletionItemKind.Property)
+            .concat([
+                {
+                    label: "Tags",
+                    insertText: "Tags {}",
+                    kind: CompletionItemKind.Keyword
+                },
+                {
+                    label: "CGPROGRAM",
+                    insertText: "CGPROGRAM\r\n\r\nENDCG",
+                    kind: CompletionItemKind.Snippet
+                }
+            ]);
+    }
+    return toCompletions(values, CompletionItemKind.EnumMember);
+}
 export
 {
     onFunctionMatch,
@@ -87,5 +226,13 @@ export
     onBlockMatch,
     onStructDeclare,
     onStructMemberDeclare,
-    onExpressionComplete
+    onExpressionComplete,
+    onPropertiesCompletion,
+    onPropertiesDeclare,
+    onShaderDeclare,
+    onSubShaderDeclare,
+    onPassDeclare,
+    onTagsMatch,
+    onTagCompletion,
+    onRenderSetupCompletion
 }

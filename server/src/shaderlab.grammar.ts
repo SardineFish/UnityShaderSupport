@@ -1,7 +1,8 @@
 import { LanguageGrammar, GrammarPattern, includePattern, namedPattern } from "./grammar";
 import { CompletionItemKind } from "vscode-languageserver";
-import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, CgGlobalContext, CgVariable, toCgVariableCompletions, toCgFunctionCompletions } from "./grammar-cg";
-import { onFunctionMatch, onParamsDeclare, onBlockMatch, onStructDeclare, onStructMemberDeclare, onExpressionComplete } from "./completion-shaderlab";
+import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, CgGlobalContext, CgVariable, toCgVariableCompletions, toCgFunctionCompletions, toCompletions } from "./grammar-cg";
+import { onFunctionMatch, onParamsDeclare, onBlockMatch, onStructDeclare, onStructMemberDeclare, onExpressionComplete, onPropertiesCompletion, onPropertiesDeclare, onShaderDeclare, onSubShaderDeclare, onTagsMatch, onTagCompletion, onPassDeclare, onRenderSetupCompletion } from "./completion-shaderlab";
+import { getKeys, renderSetups } from "./structure-shaderlb";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -20,22 +21,37 @@ const grammarShaderLab: LanguageGrammar = {
     },
     patterns: [
         {
-            patterns: ["Shader <string> {shaderScope}"],
+            name: "Shader",
+            id:"shader-declare",
+            patterns: [
+                "Shader <string> {shaderScope}",
+            ],
             caseInsensitive: true,
             crossLine: true,
             scopes: {
                 "shaderScope": {
-                    name: "Shader",
+                    name: "Shader Scope",
                     begin: "{",
                     end: "}",
                     patterns: [
                         { patterns: ["<propertiesPattern>"] },
                         { patterns: ["<subShaderPattern>"] }
-                    ]
+                    ],
+                    onCompletion: (match) =>
+                    {
+                        if (match.patternName != "propertiesPattern" && match.patternName != "subShaderPattern")
+                        {
+                            return toCompletions(["Properties", "SubShader"], CompletionItemKind.Keyword)
+                                .concat(toCompletions(["Fallback"], CompletionItemKind.Property));
+                        }
+                    },
+                    onMatched: onShaderDeclare
                 }
-            }
+            },
+
         }
     ],
+    onCompletion: () => toCompletions(["Shader"], CompletionItemKind.Keyword),
     patternRepository: {
         "propertiesPattern":
         {
@@ -53,7 +69,9 @@ const grammarShaderLab: LanguageGrammar = {
                             patterns: ["<identifier> (<displayName>, <propType>) = <propertyValue>"],
                             dictionary: {
                                 "displayName": GrammarPattern.String
-                            }
+                            },
+                            onCompletion: onPropertiesCompletion,
+                            onMatched:onPropertiesDeclare
                         }
                     ]
                 }
@@ -92,7 +110,8 @@ const grammarShaderLab: LanguageGrammar = {
                         includePattern("renderSetupPattern"),
                         includePattern("pass"),
                         includePattern("cgProgram")
-                    ]
+                    ],
+                    onMatched:onSubShaderDeclare
                 }
             }
         },
@@ -109,7 +128,8 @@ const grammarShaderLab: LanguageGrammar = {
                         includePattern("tagsPattern"),
                         includePattern("renderSetupPattern"),
                         includePattern("cgProgram")
-                    ]
+                    ],
+                    onMatched: onPassDeclare,
                 }
             }
         },
@@ -122,28 +142,40 @@ const grammarShaderLab: LanguageGrammar = {
                 "tagScope": {
                     begin: "{",
                     end: "}",
+                    skipMode: "space",
                     patterns: [
                         {
+                            id:"tag",
                             patterns: ["<tag> = <value>"],
                             dictionary: {
-                                "tag": GrammarPattern.String,
-                                "value": GrammarPattern.String
-                            }
+                                "tag": {patterns:["<string>","<identifier>"]},
+                                "value": {patterns:["<string>","<identifier>"]}
+                            },
+                            onCompletion:  onTagCompletion
                         }
-                    ]
+                    ],
+                    onCompletion: onTagCompletion
                 }
-            }
+            },
         },
         "renderSetupPattern": {
             name: "Render Setup",
-            patterns: ["<property> < > <value>"],
+            patterns: ["<stateName> < > <value> [[,] < > <value>...]"],
             dictionary: {
-                "property": GrammarPattern.Identifier,
+                "stateName": GrammarPattern.Identifier,
                 "value": {
                     name: "Render Setup Value",
-                    patterns: ["<identifier>", "<string>", "<number>"]
+                    patterns: ["<identifier>", "<string>", "<number>", "{value-scope}"],
+                    scopes: {
+                        "value-scope": {
+                            begin: "{",
+                            end: "}",
+                            patterns:[]
+                        }
+                    }
                 }
-            }
+            },
+            onCompletion:onRenderSetupCompletion
         },
         "cgProgram": {
             name: "Cg Program",

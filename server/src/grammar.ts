@@ -337,18 +337,25 @@ class ScopePattern extends OrderedPatternSet
                     failedMatches = [];
                     unMatched.startOffset = startOffset;
                     match.addChildren(unMatched);
-
-                    let pos = doc.positionAt(startOffset);
-                    pos.line++;
-                    pos.character = 0;
-                    startOffset = doc.offsetAt(pos);
-                    unMatched.endOffset = startOffset - 1;
-                    // Chceck if reach end
-                    let pos2 = doc.positionAt(startOffset);
-                    if (pos2.line !== pos.line)
+                    if (!this.scope.skipMode || this.scope.skipMode === "line")
                     {
-                        match.matched = false;
-                        return match;
+                        let pos = doc.positionAt(startOffset);
+                        pos.line++;
+                        pos.character = 0;
+                        startOffset = doc.offsetAt(pos);
+                        unMatched.endOffset = startOffset - 1;
+                        // Chceck if reach end
+                        let pos2 = doc.positionAt(startOffset);
+                        if (pos2.line !== pos.line)
+                        {
+                            match.matched = false;
+                            return match;
+                        }
+                    }
+                    else
+                    {
+                        startOffset = linq.from(unMatched.allMatches).max(match => match.endOffset);
+                        unMatched.endOffset = startOffset;
                     }
                     cleanSpace();
                 }
@@ -598,6 +605,12 @@ class ScopeMatchResult extends MatchResult
 }
 class GrammarMatchResult extends ScopeMatchResult
 {
+    grammar: LanguageGrammar;
+    constructor(doc: TextDocument, grammar: Grammar)
+    {
+        super(doc, grammar);
+        this.grammar = grammar.grammar;
+    }
     requestCompletion(pos: Position): CompletionItem[]
     {
         let completions: CompletionItem[] = [];
@@ -607,6 +620,18 @@ class GrammarMatchResult extends ScopeMatchResult
         if (match instanceof UnMatchedText)
         {
             completions = completions.concat(match.requestCompletion(pos));
+        }
+        else if (match instanceof GrammarMatchResult)
+        {
+            completions = match.grammar.onCompletion ?
+                completions.concat(match.grammar.onCompletion(match)) :
+                completions;
+        }
+        else if (match instanceof ScopeMatchResult)
+        {
+            completions = (match.scope && match.scope.onCompletion) ?
+                completions.concat(match.scope.onCompletion(match)) :
+                completions;
         }
         for (let matchP = match; matchP != null; matchP = matchP.parent)
         {
@@ -624,7 +649,16 @@ class GrammarMatchResult extends ScopeMatchResult
             }
         }
         // Remove same 
-        completions = linq.from(completions).orderBy(item => item.label).toArray();
+
+        completions = linq.from(completions)
+            .where(item => item !== undefined)
+            .distinct(comp=>comp.label)
+            .toArray();
+        return completions;
+        completions = linq.from(completions)
+            .where(item => item !== undefined)
+            .orderBy(item => item.label)
+            .toArray();
         let selectedCompletions: CompletionItem[] = [];
         for (let i = 0; i < completions.length; i++)
         {
@@ -717,6 +751,9 @@ class UnMatchedText extends MatchResult
 
             }
         });
+        completions = (this.matchedScope && this.matchedScope.scope && this.matchedScope.scope.onCompletion) ?
+            completions.concat(this.matchedScope.scope.onCompletion(this)) :
+            completions;
         return completions;
     }
     addChildren(match: MatchResult)
@@ -747,6 +784,10 @@ class UnMatchedPattern extends UnMatchedText
         });
         //console.log(this.text);
     }
+    getMatch(name: string): MatchResult[]
+    {
+        return linq.from(this.allSubMatches).where(match => match.patternName === name).toArray();
+    }
 }
 class PatternDictionary
 {
@@ -760,6 +801,7 @@ class GrammarScope
 {
     begin: string;
     end: string;
+    skipMode?: "line" | "space";
     patterns?: GrammarPattern[];
     scopes?: GrammarScope[];
     name?: string;
@@ -804,7 +846,8 @@ class LanguageGrammar
     stringDelimiter?: string[];
     pairMatch?: string[][];
     patternRepository?: PatternDictionary;
-    scopeRepository?: ScopeDictionary
+    scopeRepository?: ScopeDictionary;
+    onCompletion?: DocumentCompletionCallback;
 }
 function analyseBracketItem(item: string, pattern: GrammarPattern): PatternItem
 {
@@ -1047,5 +1090,6 @@ export
     namedPattern,
     MatchResult,
     PatternMatchResult,
-    ScopeMatchResult
+    ScopeMatchResult,
+    UnMatchedPattern
 };
