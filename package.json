@@ -1,7 +1,7 @@
 {
     "name": "unityshader-intellisense",
     "displayName": "UnityShader Support",
-    "description": "Syntax highlight support to Unity shader",
+    "description": "Language support for Unity Shader",
     "version": "0.2.3-alpha",
     "publisher": "SardineFish",
     "license": "MIT",

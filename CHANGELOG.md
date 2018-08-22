@@ -5,7 +5,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-## [2.0.1] - 2018-8-22
+## [0.2.3-beta] - 2018-8-22
+## Changed
+- Update project settings
+- Fix bugs
+- Change version format
+
+## [0.2.1-alpha] - 2018-8-22
 ### Added
 - Language server
 - Auto-completion
@@ -13,15 +19,15 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Changed
 - Update .tmLanguage
 
-## [1.0.2] - 2018-8-16
+## [0.1.0-alpha] - 2018-8-16
 ### Changed
 - Update README
 
-## [1.0.1] - 2018-8-16
+## [0.0.2-alpha] - 2018-8-16
 ### Changed
 - Fix bugs.
 
-## [1.0.0] - 2018-8-16
+## [0.0.1-alpha] - 2018-8-16
 ### Added
 - Add syntax hightlight support for ShaderLab.
 - Add some snippets.
