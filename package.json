@@ -2,7 +2,7 @@
     "name": "unityshader-intellisense",
     "displayName": "UnityShader Support",
     "description": "Syntax highlight support to Unity shader",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "publisher": "SardineFish",
     "license": "MIT",
     "engines": {
@@ -21,7 +21,7 @@
         "watch:server": "tsc -w -p ./server/tsconfig.json",
         "watch": "npm run watch:client && npm run watch:server"
     },
-    "icon": "./res/img/logo.png",
+    "icon": "res/img/logo.png",
     "main": "./client/out/extension",
     "activationEvents": [
         "onLanguage:shaderlab"
