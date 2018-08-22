@@ -21,7 +21,7 @@
         "watch:server": "tsc -w -p ./server/tsconfig.json",
         "watch": "npm run watch:client && npm run watch:server"
     },
-    "icon": "https://cdn-img.sardinefish.com/NTk3NDAx",
+    "icon": "./res/img/logo.png",
     "main": "./client/out/extension",
     "activationEvents": [
         "onLanguage:shaderlab"

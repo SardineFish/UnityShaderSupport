@@ -5,7 +5,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-## [2.0.0] - 2018-8-22
+## [2.0.1] - 2018-8-22
 ### Added
 - Language server
 - Auto-completion
