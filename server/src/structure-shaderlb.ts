@@ -3,7 +3,7 @@ import { CgGlobalContext } from "./grammar-cg";
 const booleanValue: string[] = ["True", "False"];
 const subShaderTags: Dictionary<string[]> = {
     "Queue": ["Background", "Geometry", "AlphaTest", "Transparent", "Overlay"],
-    "RenderType": ["Opaque", "Transparent", "TransparentCutout", "Background", "Overlay", "TreeOpaque", "TreeTransparentCutout", "TreeBillboard", "Grass", "GrassBillboard"];
+    "RenderType": ["Opaque", "Transparent", "TransparentCutout", "Background", "Overlay", "TreeOpaque", "TreeTransparentCutout", "TreeBillboard", "Grass", "GrassBillboard"],
     "RequireOptions": ["SoftVegetation"],
     "DisableBatching": ["True", "False", "LODFading"],
     "ForceNoShadowCasting": booleanValue,
@@ -28,11 +28,9 @@ const renderSetups: Dictionary<string[]> = {
     "SeparateSpecular": ["On", "Off"],
     "Color": [],
     "ColorMaterial": ["AmbientAndDiffuse", "Emission"],
-    "AlphaTest": ["Less", "Greater", "LEqual", "GEqual", "Equal", "NotEqual", "Always"];
+    "AlphaTest": ["Less", "Greater", "LEqual", "GEqual", "Equal", "NotEqual", "Always"],
     "SetTexture": [],
     "Fog": [],
-    "Material": [],
-    "SetTexture": [],
     "LOD":[]
 };
 
