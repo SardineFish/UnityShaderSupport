@@ -12,7 +12,7 @@ const subShaderTags: Dictionary<string[]> = {
     "PreviewType": ["Sphere", "Plane", "Skybod", "Cube"]
 };
 const passTags: Dictionary<string[]> = {
-    "LightMode": ["Always", "ForwardBase", "ForwardAdd", "Deferred", "ShadowCaster", "PrepassBase", "PrepassFinal", "Vertex", "VertexLMRGBM", "VertexLM"];
+    "LightMode": ["Always", "ForwardBase", "ForwardAdd", "Deferred", "ShadowCaster", "PrepassBase", "PrepassFinal", "Vertex", "VertexLMRGBM", "VertexLM"],
     "PassFlags": ["OnlyDirectional"],
     "RequireOptions": ["SoftVegetation"]
 };
@@ -32,7 +32,8 @@ const renderSetups: Dictionary<string[]> = {
     "SetTexture": [],
     "Fog": [],
     "Material": [],
-    "SetTexture":[]
+    "SetTexture": [],
+    "LOD":[]
 };
 
 class Dictionary<TValue>

@@ -28,13 +28,13 @@
 		"buildin-tags": {
 			"patterns": [{
 				"name": "support.variable.shaderlab",
-				"match": "\\b((?i)Queue|RenderType|DisableBatching|ForceNoShadowCasting|IgnoreProjector|CanUseSpriteAtlas|PreviewType)\\b"
+				"match": "\\b((?i)Queue|RenderType|DisableBatching|ForceNoShadowCasting|IgnoreProjector|CanUseSpriteAtlas|PreviewType|LightMode|PassFlags|RquireOptions)\\b"
 			}]
 		},
 		"buildin-tag-values": {
 			"patterns": [{
 				"name": "keyword.other.unit.shaderlab",
-				"match": "\\b((?i)Background|Geometry|AlphaTest|Transparent|Overlay|Opaque|Transparent|TransparentCutout|Background|Overlay|TreeOpaque|TreeTransparentCutout|TreeBillboard|Grass|GrassBillboard|True|False|LODFading|Plane|SkyBox|Sphere)\\b"
+				"match": "\\b((?i)Background|Geometry|AlphaTest|Transparent|Overlay|Opaque|Transparent|TransparentCutout|Background|Overlay|TreeOpaque|TreeTransparentCutout|TreeBillboard|Grass|GrassBillboard|True|False|LODFading|Plane|SkyBox|Sphere|Always|ForwardBase|FowardAdd|Deferred|ShadowCaster|PrepassBase|PrepassFinal|Vertex|VertexLMRGBM|VertexLM|OnlyDirectional|SoftVegetation)\\b"
 			}]
 		},
 		"render-setup-values": {
@@ -42,7 +42,7 @@
 					"include": "#numeric"
 				},
 				{
-					"name": "keyword.other.render-setup.values.shaderlab",
+					"name": "keyword.other.unit.shaderlab",
 					"match": "\\b((?i)Back|Front|Off|Less|Greater|LEqual|GEqual|Equal|NotEqual|Always|On|Off|RGBA|RGB|OffsetFactor|OffsetUnits)\\b"
 				},
 				{
