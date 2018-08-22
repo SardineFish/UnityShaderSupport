@@ -1,5 +1,6 @@
 import linq from "linq"
 import { CompletionItem, CompletionItemKind } from "vscode-languageserver";
+import { Shader, SubShader, Pass } from "./structure-shaderlb";
 const scalarTypes = ["float", "half", "int", "fixed"];
 const otherTypes = ["bool", "void"];
 const vectorTypes = concat(scalarTypes.map(t => [1, 2, 3, 4].map(n => `${t}${n}`)));
@@ -7,6 +8,8 @@ const matrixTypes = concat(scalarTypes.map(t => [1, 2, 3, 4].map(n => `${t}${n}x
 const samplerTypes = concat(["sampler"].map(t => ["1D", "2D", "3D", "CUBE", "RECT"].map(d => `${t}${d}`)));
 const keyWords = ["if", "for", "while", "do"];
 const propertyTypes = ["Range", "Float", "Int", "Color", "Vector", "2D", "Cube", "3D"];
+const preprocessors = ["vertex", "fragment", "geometry", "hull", "domain", "target", "only_renderers", "exclude_renderers", "multi_compile", "enable_d3d11_debug_symbols", "hardware_tier_variants"];
+
 
 function concat<T>(list: T[][]):T[]
 {
@@ -152,6 +155,7 @@ class CgContext
 }
 class CgGlobalContext extends CgContext
 {
+    shader: Shader;
     declaredTypes: CgType[] = [];
     functions: CgFunction[] = [];
     constructor()
@@ -237,5 +241,6 @@ export
     toCgFunctionCompletions,
     toCgFieldCompletions,
     toCompletions,
-    propertyTypes
+    propertyTypes,
+    preprocessors
 };

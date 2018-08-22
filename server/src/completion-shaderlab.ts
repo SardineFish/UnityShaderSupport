@@ -1,6 +1,6 @@
 import { CompletionItem, CodeActionKind, CompletionItemKind } from "vscode-languageserver";
 import { MatchResult, PatternMatchResult, ScopeMatchResult, UnMatchedPattern } from "./grammar";
-import { CgFunction, CgContext, CgVariable, CgGlobalContext, CgType, toCgVariableCompletions, toCgFunctionCompletions, toCgFieldCompletions, toCompletions, propertyTypes } from "./grammar-cg";
+import { CgFunction, CgContext, CgVariable, CgGlobalContext, CgType, toCgVariableCompletions, toCgFunctionCompletions, toCgFieldCompletions, toCompletions, propertyTypes, cgBuildInTypesCompletion, preprocessors } from "./grammar-cg";
 import { Shader, ShaderProperty, SubShader, Pass, Tag, subShaderTags, passTags, getKeys, renderSetups } from "./structure-shaderlb";
 
 function getMatchedProps(match: PatternMatchResult|UnMatchedPattern, name: string, defaultValue: string = null)
@@ -207,7 +207,7 @@ function onRenderSetupCompletion(match: MatchResult): CompletionItem[]
             .concat([
                 {
                     label: "Tags",
-                    insertText: "Tags {}",
+                    insertText: "Tags { }",
                     kind: CompletionItemKind.Keyword
                 },
                 {
@@ -215,9 +215,82 @@ function onRenderSetupCompletion(match: MatchResult): CompletionItem[]
                     insertText: "CGPROGRAM\r\n\r\nENDCG",
                     kind: CompletionItemKind.Snippet
                 }
-            ]);
+            ])
+            .concat(match.matchedScope.state instanceof SubShader ?
+                [{
+                    label: "Pass",
+                    insertText: "Pass {\r\n\r\n}",
+                    kind: CompletionItemKind.Snippet
+                }] : []);
     }
     return toCompletions(values, CompletionItemKind.EnumMember);
+}
+function cgGlobalCompletion(match:MatchResult): CompletionItem[]
+{
+    if (match.text.length <= 1)
+    {
+        return cgBuildInTypesCompletion
+            .concat(toCompletions(["struct", "#pragma"], CompletionItemKind.Keyword));
+    }
+    else if (match.patternName ==="cgProgram")
+    {
+        return cgBuildInTypesCompletion
+            .concat(toCompletions(["struct", "#pragma"], CompletionItemKind.Keyword));
+    }
+    return [];
+    
+}
+function cgPreprocessorCompletion(match: MatchResult): CompletionItem[]
+{
+    if (match instanceof UnMatchedPattern)
+    {
+        let cmd = getMatchedProps(match, "cmd");
+        if (!cmd)
+            return toCompletions(preprocessors, CompletionItemKind.Keyword);
+    }
+    else if (match instanceof PatternMatchResult)
+    {
+        let name = getMatchedProps(match, "name");
+        let cmd = getMatchedProps(match, "cmd");
+        if (name)
+        {
+            return [];
+        }
+        else if (cmd)
+        {
+            if (["vertex", "fragment", "geometry", "hull", "domain", "surface"].indexOf(cmd) >= 0)
+            {
+                let context = match.matchedScope.state as CgGlobalContext;
+                return toCgFunctionCompletions(context.functions);
+            }
+        }
+        
+    }
+    return [];
+}
+function onVariableDeclare(match: MatchResult): CompletionItem[]
+{
+    if (match.patternName === "type")
+    {
+        return cgBuildInTypesCompletion;
+    }
+    else if (match.patternName === "name")
+    {
+        let context = match.matchedScope.state;
+        if (context instanceof CgGlobalContext)
+        {
+            
+            return context.shader.properties.map(prop =>
+            {
+                return {
+                    label: prop.identifier,
+                    detail: prop.toString(),
+                    kind: CompletionItemKind.Unit
+                };
+            })
+        }
+    }
+    return [];
 }
 export
 {
@@ -234,5 +307,8 @@ export
     onPassDeclare,
     onTagsMatch,
     onTagCompletion,
-    onRenderSetupCompletion
+    onRenderSetupCompletion,
+    cgGlobalCompletion,
+    cgPreprocessorCompletion,
+    onVariableDeclare
 }

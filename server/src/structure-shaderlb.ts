@@ -110,6 +110,11 @@ class SubShader
     {
         this.renderSetups.push(renderSetup);
     }
+    setCgCode(cg: CgGlobalContext)
+    {
+        this.cgCode = cg;
+        cg.shader = this.shader;
+    }
 }
 class Pass
 {
@@ -124,6 +129,11 @@ class Pass
     addRenderSetup(renderSetup: RenderSetup)
     {
         this.renderSetups.push(renderSetup);
+    }
+    setCgCode(cg: CgGlobalContext)
+    {
+        this.cgCode = cg;
+        cg.shader = this.subShader.shader;
     }
 }
 class KeyValuePare<TKey,TValue>

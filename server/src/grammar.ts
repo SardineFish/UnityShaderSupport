@@ -617,6 +617,10 @@ class GrammarMatchResult extends ScopeMatchResult
         let match = this.locateMatchAtPosition(pos);
         if (!match)
             return [];
+        if (match instanceof UnMatchedPattern)
+        {
+            completions = completions.concat(match.requestCompletion(pos));
+        }
         if (match instanceof UnMatchedText)
         {
             completions = completions.concat(match.requestCompletion(pos));
@@ -635,6 +639,10 @@ class GrammarMatchResult extends ScopeMatchResult
         }
         for (let matchP = match; matchP != null; matchP = matchP.parent)
         {
+            if (matchP instanceof PatternMatchResult && matchP.pattern.onCompletion)
+            {
+                completions = completions.concat(matchP.pattern.onCompletion(matchP));
+            }
             if (!matchP.patternName)
                 continue;
             if (matchP.matchedPattern && matchP.matchedPattern.pattern.onCompletion)
@@ -722,6 +730,10 @@ class UnMatchedText extends MatchResult
             let endMatch = match.locateMatchAtPosition(pos);
             if (!endMatch)
                 return;
+            if (match instanceof UnMatchedPattern)
+            {
+                completions = completions.concat(match.requestCompletion(pos));
+            }
             if (endMatch instanceof UnMatchedText)
             {
                 completions = completions.concat(endMatch.requestCompletion(pos));
@@ -783,6 +795,13 @@ class UnMatchedPattern extends UnMatchedText
             }
         });
         //console.log(this.text);
+    }
+    requestCompletion(pos: Position)
+    {
+        let completions: CompletionItem[] = [];
+        if (this.pattern.onCompletion)
+            completions = completions.concat(this.pattern.onCompletion(this));
+        return completions.concat(super.requestCompletion(pos));
     }
     getMatch(name: string): MatchResult[]
     {

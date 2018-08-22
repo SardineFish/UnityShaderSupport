@@ -1,8 +1,8 @@
 import { LanguageGrammar, GrammarPattern, includePattern, namedPattern } from "./grammar";
 import { CompletionItemKind } from "vscode-languageserver";
 import { cgBuildInTypesCompletion, cgBuildInKeywordsCompletion, CgContext, CgGlobalContext, CgVariable, toCgVariableCompletions, toCgFunctionCompletions, toCompletions } from "./grammar-cg";
-import { onFunctionMatch, onParamsDeclare, onBlockMatch, onStructDeclare, onStructMemberDeclare, onExpressionComplete, onPropertiesCompletion, onPropertiesDeclare, onShaderDeclare, onSubShaderDeclare, onTagsMatch, onTagCompletion, onPassDeclare, onRenderSetupCompletion } from "./completion-shaderlab";
-import { getKeys, renderSetups } from "./structure-shaderlb";
+import { onFunctionMatch, onParamsDeclare, onBlockMatch, onStructDeclare, onStructMemberDeclare, onExpressionComplete, onPropertiesCompletion, onPropertiesDeclare, onShaderDeclare, onSubShaderDeclare, onTagsMatch, onTagCompletion, onPassDeclare, onRenderSetupCompletion, cgGlobalCompletion, cgPreprocessorCompletion, onVariableDeclare } from "./completion-shaderlab";
+import { getKeys, renderSetups, Pass, SubShader } from "./structure-shaderlb";
 const grammarShaderLab: LanguageGrammar = {
     stringDelimiter: ["\""],
     pairMatch: [
@@ -186,10 +186,11 @@ const grammarShaderLab: LanguageGrammar = {
                     end: "ENDCG",
                     patterns: [
                         {
+                            id:"preprocessor",
                             name: "Preprocessor",
                             patterns: [
-                                "#pragma <cmd> <name>[ <options>...]",
-                                "#pragma <cmd>[ <feature>...]",
+                                "#pragma <cmd> <name> [<options> ...]",
+                                "#pragma <cmd> [<feature> ...]",
                                 "#pragma <cmd>"
                             ],
                             keepSpace: true,
@@ -197,7 +198,8 @@ const grammarShaderLab: LanguageGrammar = {
                                 "name": {
                                     patterns: ["<number>", "<identifier>"]
                                 }
-                            }
+                            },
+                            onCompletion:cgPreprocessorCompletion
                         },
                         includePattern("variableDeclare"),
                         includePattern("functionDefinition"),
@@ -206,7 +208,16 @@ const grammarShaderLab: LanguageGrammar = {
                     onMatched: (match) =>
                     {
                         match.state = new CgGlobalContext();
-                    }
+                        if (match.matchedScope.state instanceof Pass)
+                        {
+                            match.matchedScope.state.setCgCode(match.state);
+                        }
+                        else if (match.matchedScope.state instanceof SubShader)
+                        {
+                            match.matchedScope.state.setCgCode(match.state);
+                        }
+                    },
+                    onCompletion:cgGlobalCompletion
                 }
             }
         },
@@ -275,14 +286,7 @@ const grammarShaderLab: LanguageGrammar = {
                 let context = match.matchedScope.state as CgContext;
                 context.addVariable(new CgVariable(context.getType(type), name, semantics));
             },
-            onCompletion: (match) =>
-            {
-                if (match.patternName === "type")
-                {
-                    return cgBuildInTypesCompletion;
-                }
-                return [];
-            }
+            onCompletion: onVariableDeclare
         },
         "expression": {
             name: "Expression",
