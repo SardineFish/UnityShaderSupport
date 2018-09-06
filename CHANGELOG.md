@@ -5,6 +5,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.2.5] - 2018-9-6
+## Changed
+- Fix bugs.
+
 ## [0.2.4] - 2018-8-22
 ## Changed
 - Update project settings

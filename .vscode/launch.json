@@ -5,6 +5,7 @@
 {
 	"version": "0.2.0",
     "configurations": [
+
         {
             "type": "node",
             "request": "attach",
@@ -31,6 +32,12 @@
             "outFiles": [
                 "${workspaceFolder}/client/out/**/*.js"
             ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run & Attach",
+            "configurations": ["Run Extension","Attach to Server"]
         }
     ]
 }

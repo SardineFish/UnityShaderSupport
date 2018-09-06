@@ -372,7 +372,7 @@ const grammarShaderLab: LanguageGrammar = {
                     patterns: ["<no-sense>"],
                     dictionary: {
                         "no-sense": {
-                            patterns:["/[_a-zA-Z0-9]+\\s*\\r\\n/"]
+                            patterns:["/[_a-zA-Z0-9]+\\r\\n/"]
                         }
                     }
                 }
