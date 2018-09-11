@@ -1,4 +1,4 @@
-import { TextDocument, Position, TextDocumentItem, LogMessageNotification, CompletionItem, Diagnostic, Range } from "vscode-languageserver";
+import { TextDocument, Position, CompletionItem, Diagnostic } from "vscode-languageserver";
 import linq from "linq";
 //import sourceShaderLab from "./shaderlab.grammar";
 
