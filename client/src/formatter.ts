@@ -43,8 +43,7 @@ class Gap extends DocRange
     get prevCh() { return this.doc.getText(new Range(this.doc.positionAt(this.startOffset - 1), this.start)); }
     get latterCh() { return this.doc.getText(new Range(this.end, this.doc.positionAt(this.endOffset + 1)));}
 }
-
-function findIgnoreRange(doc: TextDocument): Range[]
+function findIgnoreRange(doc: TextDocument): DocRange[]
 {
     let ranges = [];
     const regCommentBlock = /(\/\*(?!\/).*?\*\/)/;
@@ -241,5 +240,14 @@ export function format(doc: TextDocument, options:FormattingOptions):TextEdit[]
             }
         }
     }
+    return editList;
+}
+
+export function inlineFormat(doc: TextDocument, ch: string, pos: Position, options: FormattingOptions):TextEdit[]
+{
+    let editList: TextEdit[] = [];
+    
+    
+
     return editList;
 }

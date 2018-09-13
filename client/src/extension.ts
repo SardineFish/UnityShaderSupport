@@ -3,7 +3,7 @@ import * as path from 'path';
 import { workspace, ExtensionContext } from "vscode";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from "vscode-languageclient";
-import { format } from './formatter';
+import { format, inlineFormat } from './formatter';
 
 let client: LanguageClient;
 
@@ -48,8 +48,8 @@ export function activate(context: ExtensionContext)
         provideOnTypeFormattingEdits(document: vscode.TextDocument, position: vscode.Position, ch: string, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.TextEdit[]
         {
             
-            return [];
+            return inlineFormat(document, ch, position, options);
         }
-    }, ";");
+    }, ";", "\n", "{", "}");
     console.log("Registered formatter.");
 }
