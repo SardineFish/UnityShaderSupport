@@ -3,7 +3,7 @@ import * as path from 'path';
 import { workspace, ExtensionContext } from "vscode";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from "vscode-languageclient";
-import { format, inlineFormat } from './formatter';
+import { Formatter } from './formatter';
 
 let client: LanguageClient;
 
@@ -40,15 +40,14 @@ export function activate(context: ExtensionContext)
     vscode.languages.registerDocumentFormattingEditProvider("shaderlab", {
         provideDocumentFormattingEdits(document: vscode.TextDocument, options: vscode.FormattingOptions): vscode.TextEdit[]
         {
-            console.log("Format");
-            return format(document, options);
+            return new Formatter(document, options).format();
         }
     });
     vscode.languages.registerOnTypeFormattingEditProvider("shaderlab", {
         provideOnTypeFormattingEdits(document: vscode.TextDocument, position: vscode.Position, ch: string, options: vscode.FormattingOptions, token: vscode.CancellationToken): vscode.TextEdit[]
         {
             
-            return inlineFormat(document, ch, position, options);
+            return new Formatter(document, options).format(ch, position);
         }
     }, ";", "\n", "{", "}");
     console.log("Registered formatter.");
