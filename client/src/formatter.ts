@@ -63,9 +63,11 @@ export class Formatter
 {
     indentUnit: string;
     ignoreRanges: DocRange[];
+    emptyRanges: DocRange[];
     cgRanges: Range[];
     doc: TextDocument;
-    private ignoreFormmat = (range: Range) => this.ignoreRanges.some(r => r.contains(range));
+    private isEmpty = (range: Range | Position) => this.emptyRanges.some(r => r.contains(range));
+    private ignoreFormmat = (range: Range | Position) => this.ignoreRanges.some(r => r.contains(range));
     private containsComments = (range: Range) => this.ignoreRanges.filter(r => r instanceof CommentBlock).some(r => range.contains(r));
     private genIndent = (count: number) => linq.repeat(this.indentUnit, count).toArray().join("");
     private inCG = (range: Range | Position) => this.cgRanges.some(cg => cg.contains(range));
@@ -75,6 +77,7 @@ export class Formatter
         this.indentUnit = options.insertSpaces ? linq.repeat(" ", options.tabSize).toArray().join("") : "\t";
         this.ignoreRanges = this.findIgnoreRange();
         this.cgRanges = this.findCGCode();
+        this.emptyRanges = this.findEmptyRanges();
     }
 
     private findCGCode(): Range[]
@@ -124,7 +127,20 @@ export class Formatter
         return ranges;
     }
 
-    private splitGap( line: number): Gap[]
+    private findEmptyRanges(): DocRange[]
+    {
+        let ranges = [];
+        const reg = /(\s|(\/\*(?!\/).*?\*\/)|\/\/.*[\r]?[\n]?)+/g;
+        let totalText = this.doc.getText();
+        for (let match = reg.exec(totalText); match; match = reg.exec(totalText))
+        {
+            if (match[0].length > 0)
+                ranges.push(new DocRange(this.doc, match.index, match.index + match[0].length));
+        }
+        return ranges;
+    }
+
+    private splitGap(line: number): Gap[]
     {
         let text = this.doc.lineAt(line).text;
         let empties: Gap[] = [];
@@ -179,7 +195,45 @@ export class Formatter
             return true;
         return false;
 
-    } 
+    }
+
+    getFormatRange(pos: Position): Range
+    {
+        let offset = this.doc.offsetAt(pos);
+        let text = this.doc.getText();
+        let braceDepth = 0;
+        const regEmpty = /\s/;
+
+        let empty = linq.from(this.emptyRanges).where(r => r.contains(this.doc.positionAt(offset))).firstOrDefault();
+        if (empty)
+            offset -= empty.length;
+        for (let i = offset; i >= 0; i--)
+        {
+            if (text.charAt(i) === "}")
+            {
+                braceDepth++;
+                for (; i >= 0; i--)
+                {
+                    if (text.charAt(i) === "}" && !this.ignoreFormmat(this.doc.positionAt(i)))
+                        braceDepth++;
+                    else if (text.charAt(i) === "{" && !this.ignoreFormmat(this.doc.positionAt(i)))
+                        braceDepth--;
+                    if (braceDepth === 0)
+                        break;
+                }
+            }
+            let empty = linq.from(this.emptyRanges).where(r => r.contains(this.doc.positionAt(offset))).firstOrDefault();
+            if (empty)
+                i -= empty.length;
+            if (text.charAt(i) === ";" && this.inCG(this.doc.positionAt(i)))
+            {
+                return new Range(this.doc.positionAt(i + 1), pos);
+            }
+            let startPos = this.doc.positionAt(i);
+            startPos = new Position(startPos.line, 0);
+            return new Range(startPos, pos);
+        }
+    }
 
     formatInRange(range: Range, indent = 0):TextEdit[]
     {
@@ -261,11 +315,36 @@ export class Formatter
         return editList;
     }
 
-    format(trigger:string="", pos:Position = null): TextEdit[]
+    format(trigger: string = "", pos: Position = null): TextEdit[]
     {
         if (trigger === "")
             return this.formatInRange(new Range(new Position(0, 0), this.doc.positionAt(this.doc.getText().length)));
-        
-        
+        let formatRange: Range;
+        switch (trigger)
+        {
+            case "":
+                formatRange = new Range(new Position(0, 0), this.doc.positionAt(this.doc.getText().length));
+                break;
+            case "\n":
+                formatRange = new Range(new Position(pos.line - 1, 0), pos);
+                break;
+            case "{":
+                formatRange = new Range(new Position(pos.line, 0), pos);
+                break;
+            case "}":
+                formatRange = this.getFormatRange(pos);
+                break;
+            case ";":
+                formatRange = this.getFormatRange(this.doc.positionAt(this.doc.offsetAt(pos) - 2));
+                break;
+        }
+
+        let line = this.doc.lineAt(formatRange.start.line);
+        let spaceCount = line.firstNonWhitespaceCharacterIndex;
+        let indent = linq.range(0, spaceCount).select(i => line.text.charAt(i)).where(chr => chr === "\t").count();
+        // To fix bug cause by indent decending
+        if (this.splitGap(formatRange.start.line)[0].latterCh === "}")
+            indent++;
+        return this.formatInRange(formatRange, indent);
     }
 }
