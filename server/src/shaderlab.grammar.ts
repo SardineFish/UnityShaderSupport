@@ -272,7 +272,7 @@ const grammarShaderLab: LanguageGrammar = {
         },
         "variableDeclare": {
             name: "Variable Declare",
-            patterns: ["<type> < > <name> [:<semantics>] [= <expression>];"],
+            patterns: ["<type> < > <name> [:<semantics>] [= <expression>] [, <name> [:<semantics>] [= <expression>] ...];"],
             dictionary: {
                 "type": GrammarPattern.Identifier,
                 "name": GrammarPattern.Identifier,

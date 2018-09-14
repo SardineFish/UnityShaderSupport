@@ -30,7 +30,7 @@ class DocRange extends Range
                 range.end.compareTo(this.start) > 0 && range.end.compareTo(this.end) <= 0;
         else
         {
-            return super.contains(range);
+            return this.start.compareTo(range) <= 0 && this.end.compareTo(range) > 0;
         }
     }
 }
@@ -206,25 +206,28 @@ export class Formatter
 
         let empty = linq.from(this.emptyRanges).where(r => r.contains(this.doc.positionAt(offset))).firstOrDefault();
         if (empty)
-            offset -= empty.length;
+            offset = empty.startOffset - 1;
         for (let i = offset; i >= 0; i--)
         {
             if (text.charAt(i) === "}")
             {
                 braceDepth++;
-                for (; i >= 0; i--)
+                for (i--; i >= 0; i--)
                 {
                     if (text.charAt(i) === "}" && !this.ignoreFormmat(this.doc.positionAt(i)))
                         braceDepth++;
                     else if (text.charAt(i) === "{" && !this.ignoreFormmat(this.doc.positionAt(i)))
                         braceDepth--;
                     if (braceDepth === 0)
+                    {
+                        i--;
                         break;
+                    }
                 }
             }
-            let empty = linq.from(this.emptyRanges).where(r => r.contains(this.doc.positionAt(offset))).firstOrDefault();
+            let empty = linq.from(this.emptyRanges).where(r => r.contains(this.doc.positionAt(i))).firstOrDefault();
             if (empty)
-                i -= empty.length;
+                i = empty.startOffset - 1;
             if (text.charAt(i) === ";" && this.inCG(this.doc.positionAt(i)))
             {
                 return new Range(this.doc.positionAt(i + 1), pos);
@@ -342,6 +345,7 @@ export class Formatter
         let line = this.doc.lineAt(formatRange.start.line);
         let spaceCount = line.firstNonWhitespaceCharacterIndex;
         let indent = linq.range(0, spaceCount).select(i => line.text.charAt(i)).where(chr => chr === "\t").count();
+        console.log(this.doc.getText(formatRange));
         // To fix bug cause by indent decending
         if (this.splitGap(formatRange.start.line)[0].latterCh === "}")
             indent++;
