@@ -8,9 +8,13 @@ An extension for VS Code to provide language support for Unity Shader
 - VS Code 1.26.0
 
 ## Features
-- Auto-completion
-- Syntax highlight support
-- Snippets
+- **Code formatter**
+- **Auto-completion**
+- **Syntax highlight** support
+- **Snippets**
+
+### Code format
+![](https://cdn-img.sardinefish.com/NTk4NjIw)
 
 ### Auto completion in properties
 ![](https://cdn-img.sardinefish.com/NTkyMzQw)
