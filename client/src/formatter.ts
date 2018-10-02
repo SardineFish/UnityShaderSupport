@@ -145,7 +145,8 @@ export class Formatter
         let text = this.doc.lineAt(line).text;
         let empties: Gap[] = [];
 
-        const reg = /((?:(?:\+\+|--)?[_0-9a-zA-Z]+(?:\+\+|--)?)|(?:(?:(?:\+|-|\*|\/|%|=|&|\||\^|<<|>>)=?)|(?:<|>|<=|>=|==|\!=|\|\||&&)|(?:\.|\?|\:|~|,|;|\(|\)|\[|\]|{|}))|(?:"(?:[^\\"]|\\\S|\\")*"))(\s+)?/g;
+        const reg = /((?:(?:\+\+|--)?[_0-9a-zA-Z]+(?:\+\+|--)?)|(?:(?:<|>|<=|>=|==|\!=|\|\||&&)|(?:(?:\+|-|\*|\/|%|=|&|\||\^|<<|>>)=?)|(?:\.|\?|\:|~|,|;|\(|\)|\[|\]|{|}))|(?:"(?:[^\\"]|\\\S|\\")*"))(\s+)?/g;
+
         let headerSpace = /\s+/.exec(text);
         empties.push(new Gap(this.doc, new Position(line, 0), new Position(line, headerSpace ? headerSpace[0].length : 0)));
         for (let match = reg.exec(text); match; match = reg.exec(text))
