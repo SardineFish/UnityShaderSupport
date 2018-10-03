@@ -5,6 +5,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.3.1] - 2018-10-3
+### Changed
+- Fix bugs of space spliting. 
+
 ## [0.3.0] - 2018-9-6
 ### Added
 - Code formatter.
